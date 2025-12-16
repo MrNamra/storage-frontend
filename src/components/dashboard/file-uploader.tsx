@@ -14,6 +14,7 @@ import {Alert, AlertDescription} from '@/components/ui/alert';
 import {fetchDataFromAPI} from '@/lib/api';
 import constants, {getUser} from '@/lib/constants';
 import {useNavigate, useParams} from 'react-router-dom';
+import toast, { Toaster } from "react-hot-toast";
 
 export function FileUploader() {
   const [files, setFiles] = useState<File[]>([]);
@@ -39,7 +40,7 @@ export function FileUploader() {
   };
 
   const bucketList = () => {
-    fetchDataFromAPI('users/dashboard', 'get', '', user)
+    fetchDataFromAPI('user/dashboard', 'get', '', user)
       .then((res) => {
         console.log('res list', res);
         setBucket(res?.data?.bucket);
@@ -80,35 +81,49 @@ export function FileUploader() {
     }
 
     setUploading(true);
-    // Simulate upload progress
-    for (let i = 0; i <= 100; i += 10) {
-      setUploadProgress(i);
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
-    fileUpload();
 
-    setUploading(false);
-    setFiles([]);
-    setUploadProgress(0);
-    setSelectedBucket('');
-  };
-
-  const fileUpload = () => {
     const formData = new FormData();
-    formData.append('bucketId', selectedBucket);
-    // formData.append('files', files);
+    formData.append("bucket_id", selectedBucket);
 
-    for (let i = 0; i < files.length; i++) {
-      formData.append('files', files[i]);
+    files.forEach((file) => {
+      formData.append("files[]", file);
+    });
+
+    const toastId = toast.loading("Uploading files... 0%");
+
+    try {
+      const res = await fetchDataFromAPI(
+        "bucket/file/upload",
+        "post",
+        formData,
+        user,
+        // 👇 REAL PROGRESS HANDLER
+        (progressEvent) => {
+          if (!progressEvent.total) return;
+
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+
+          setUploadProgress(percent);
+
+          toast.loading(`Uploading files... ${percent}%`, {
+            id: toastId,
+          });
+        }
+      );
+
+      toast.success(res?.message || "Upload completed", { id: toastId });
+
+      setFiles([]);
+      setSelectedBucket("");
+      setUploadProgress(0);
+    } catch (error) {
+      toast.error("Upload failed", { id: toastId });
+      console.error(error);
+    } finally {
+      setUploading(false);
     }
-
-    fetchDataFromAPI('files/upload', 'post', formData, user)
-      .then((res) => {
-        console.log('res', res);
-      })
-      .catch((error) => {
-        console.log('error', error);
-      });
   };
 
   return (
@@ -119,7 +134,7 @@ export function FileUploader() {
         </SelectTrigger>
         <SelectContent>
           {bucket.map((bucket) => (
-            <SelectItem key={bucket._id} value={bucket._id}>
+            <SelectItem key={bucket.id} value={bucket.id}>
               {bucket.bucketName}
             </SelectItem>
           ))}
@@ -196,6 +211,7 @@ export function FileUploader() {
           )}
         </motion.div>
       )}
+      <Toaster position="bottom-center" reverseOrder={false} />
     </div>
   );
 }

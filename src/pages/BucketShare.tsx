@@ -25,6 +25,7 @@ import moment from 'moment';
 
 import PDFViewer from 'pdf-viewer-reactjs';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import toast, {Toaster} from 'react-hot-toast';
 const BucketShare = () => {
   const params = useParams();
   const [sortColumn, setSortColumn] = useState('name');
@@ -77,15 +78,15 @@ const BucketShare = () => {
 
   const handleCall = (page) => {
     fetchDataFromAPI(
-      `buckets/show/${params?.id}?page=${page}&limit=15`,
+      `show/${params?.id}?page=${page}&limit=15`,
       'get',
       '',
       '',
     )
       .then((res) => {
-        console.log('res', res);
+        // console.log('res', res);
         setBucket(res?.data);
-        setTotalFile(res?.totalFiles);
+        setTotalFile(res?.data?.length);
         setStorage(res?.totalStorage);
         setTotalPages(res?.pagination?.totalPages);
         // Set the fetched data to the state
@@ -143,17 +144,18 @@ const BucketShare = () => {
     // formData.append("files", selectedFiles);
 
     for (let i = 0; i < selectedFiles?.length; i++) {
-      formData.append('files', selectedFiles[i]);
+      formData.append('files[]', selectedFiles[i]);
     }
 
     setLoading(true);
     setStatus(true);
     setShowUploader(false);
 
-    fetchDataFromAPI(`files/${params?.id}/upload`, 'post', formData, '')
+    fetchDataFromAPI(`files/upload/${params?.id}`, 'post', formData, '')
       .then((res) => {
-        console.log('res', res);
-        handleCall();
+        // console.log('res', res);
+        toast.success(res?.message)
+        handleCall(currentPage);
         setSelectedFiles([]);
         setShowUploader(false);
         setLoading(false);
@@ -161,8 +163,11 @@ const BucketShare = () => {
       })
       .catch((error) => {
         console.log('error', error);
+        // setError(error?.response?.data?.message);
         setError(error?.response?.data?.message);
+        toast.error(error?.response?.data?.message)
         setLoading(false);
+        setShowUploader(false);
       });
 
     // Handle form submission logic here (e.g., API call)
@@ -206,10 +211,10 @@ const BucketShare = () => {
   }, [fileId]);
   // Get the current file object
   const currentFile = bucket[currentIndex];
-  const fileType = currentFile?.fileType; // "image/png"
-  const valueAfterSlash = fileType?.split('/')[1];
+  // const fileType = currentFile?.mime_type; // "image/png"
+  // const valueAfterSlash = fileType?.split('/')[1];
 
-  console.log('object: ', currentFile);
+  // console.log('object: ', currentFile);
 
   const handlePreviousImage = () => {
     setCurrentIndex((prevIndex) => Math.max(0, prevIndex - 1)); // Prevent going below index 0
@@ -254,7 +259,7 @@ const BucketShare = () => {
 
           {/* Storage Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-10 ">
-            <motion.div
+            {/* <motion.div
               initial={{opacity: 0, y: 20}}
               animate={{opacity: 1, y: 0}}
               className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 flex items-center space-x-4">
@@ -276,7 +281,7 @@ const BucketShare = () => {
                   {formatStorageSize(totlaStorage)} of total storage
                 </p>
               </div>
-            </motion.div>
+            </motion.div> */}
 
             <motion.div
               initial={{opacity: 0, y: 20}}
@@ -400,10 +405,10 @@ const BucketShare = () => {
                       onClick={() => preView(index)}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
+                          {/*
                           <span className="font-medium dark:text-white">
                             {file.name}
                           </span>
-                          {/*
                         <img
                         src={`http://storage.raju.serv00.net/api/thumbnil/${file.fileId}/awards-logo.png`}
                         alt={`${file.fileName}`}
@@ -414,7 +419,7 @@ const BucketShare = () => {
                       <ImageLoader key={file.fileId} fileId={file.fileId} />
                         */}
                           <img
-                            src={`https://api.happybilling.serv00.net/api/thumbnail/${file.fileId}`}
+                            src={file.thumbnail}
                             alt="Base64 Thumbnail"
                             style={{
                               width: '100px',
@@ -425,7 +430,7 @@ const BucketShare = () => {
                         </div>
                       </TableCell>
                       <TableCell className="text-gray-500 dark:text-gray-400">
-                        {file.fileName}
+                        {file.file_name}
                       </TableCell>
 
                       <TableCell className="text-gray-500 dark:text-gray-400">
@@ -542,7 +547,7 @@ const BucketShare = () => {
                   )}
 
                   <iframe
-                    src={`https://api.happybilling.serv00.net/api/buckets/show/${params?.id}/${currentFile?.fileId}`}
+                    src={currentFile?.thumbnail}
                     className="w-full h-full rounded-md shadow-lg"
                     onLoad={() => setLoading(false)} // Remove loading state once the iframe loads
                     allowFullScreen></iframe>
@@ -569,6 +574,7 @@ const BucketShare = () => {
           <div className="text-lg mt-4">Please try again or check the URL.</div>
         </div>
       )}
+      <Toaster position="bottom-center" reverseOrder={false} />
     </>
   );
 };

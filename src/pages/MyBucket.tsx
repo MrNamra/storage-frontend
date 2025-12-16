@@ -3,6 +3,7 @@ import {Button} from '@/components/ui/button';
 import {StorageMetrics} from '@/components/dashboard/storage-metrics';
 import {BucketList} from '@/components/dashboard/bucket-list';
 import {FileUploader} from '@/components/dashboard/file-uploader';
+import toast, { Toaster } from "react-hot-toast";
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import {
   Table,
@@ -58,7 +59,7 @@ export default function MyBucket() {
   const mybucket = (page) => {
     setLoading(true);
     fetchDataFromAPI(
-      `buckets/display/${params?.id}?page=${page}&limit=15`,
+      `bucket/display/${params?.id}?page=${page ?? 1}&limit=15`,
       'get',
       '',
       user,
@@ -66,7 +67,7 @@ export default function MyBucket() {
       .then((res) => {
         console.log('res', res);
         setBucket(res.data);
-        setTotalFile(res?.totalFiles);
+        setTotalFile(res?.data?.length);
         setStorage(res?.totalStorage);
         setTotalPages(res?.pagination?.totalPages);
         setLoading(false);
@@ -97,11 +98,11 @@ export default function MyBucket() {
     e.preventDefault();
 
     const formData = new FormData();
-    formData.append('bucketId', params?.id);
+    formData.append('bucket_id', params?.id);
 
     // Append all selected files to the FormData
     for (let i = 0; i < selectedFiles?.length; i++) {
-      formData.append('files', selectedFiles[i]);
+      formData.append('files[]', selectedFiles[i]);
     }
 
     try {
@@ -109,7 +110,7 @@ export default function MyBucket() {
 
       // Upload files using the API
       const res = await fetchDataFromAPI(
-        `files/upload`,
+        `bucket/file/upload`,
         'post',
         formData,
         user,
@@ -173,7 +174,7 @@ export default function MyBucket() {
   // Get the current file object
   const currentFile = bucket[currentIndex];
 
-  const fileType = currentFile?.fileType; // "image/png"
+  const fileType = currentFile?.mime_type; // "image/png"
   const valueAfterSlash = fileType?.split('/')[1];
 
   console.log('object: ', valueAfterSlash);
@@ -191,14 +192,16 @@ export default function MyBucket() {
   const handleDelete = (id) => {
     console.log('id', id);
     setLoading(true);
-    fetchDataFromAPI(`files/${params?.id}?fileId=[${id}]`, 'delete', '', user)
+    fetchDataFromAPI(`bucket/${params?.id}/delete-file`, 'post', { file_id: [id] }, user)
       .then((res) => {
-        console.log('res', res);
+        // console.log('res', res);
+        toast.success(res?.message)
         mybucket();
         setLoading(false);
       })
       .catch((error) => {
         setLoading(false);
+        toast.error(res?.message)
 
         console.log('error', error);
       });
@@ -230,7 +233,7 @@ export default function MyBucket() {
 
       <DashboardLayout>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <motion.div
+          {/* <motion.div
             initial={{opacity: 0, y: 20}}
             animate={{opacity: 1, y: 0}}
             className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 flex items-center space-x-4">
@@ -252,7 +255,7 @@ export default function MyBucket() {
                 {formatStorageSize(totlaStorage)} of total storage
               </p>
             </div>
-          </motion.div>
+          </motion.div> */}
 
           <motion.div
             initial={{opacity: 0, y: 20}}
@@ -379,9 +382,9 @@ export default function MyBucket() {
                       onClick={() => preView(index)}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
-                          <span className="font-medium dark:text-white">
-                            {file.name}
-                          </span>
+                          {/* <span className="font-medium dark:text-white">
+                            {file.file_name}
+                          </span> */}
                           {/*
                         <img
                         src={`http://storage.raju.serv00.net/api/thumbnil/${file.fileId}/awards-logo.png`}
@@ -393,8 +396,8 @@ export default function MyBucket() {
                       <ImageLoader key={file.fileId} fileId={file.fileId} />
                         */}
                           <img
-                            src={`https://api.happybilling.serv00.net/api/thumbnail/${file.fileId}`}
-                            alt="Base64 Thumbnail"
+                            src={file.thumbnail}
+                            alt="Thumbnail"
                             style={{
                               width: '100px',
                               height: '100px',
@@ -404,7 +407,7 @@ export default function MyBucket() {
                         </div>
                       </TableCell>
                       <TableCell className="text-gray-500 dark:text-gray-400">
-                        {file.fileName}
+                        {file.file_name}
                       </TableCell>
 
                       <TableCell className="text-gray-500 dark:text-gray-400">
@@ -420,7 +423,7 @@ export default function MyBucket() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() => handleDelete(file?.fileId)}
+                              onClick={() => handleDelete(file?.msg_id)}
                               className="text-red-600 dark:text-red-400">
                               <Trash2 className="h-4 w-4 mr-2" />
                               Delete
@@ -477,7 +480,7 @@ export default function MyBucket() {
               )}
 
               <iframe
-                src={`https://api.happybilling.serv00.net/api/buckets/display/${params?.id}/${currentFile?.fileId}`}
+                src={currentFile?.thumbnail}
                 className="w-full h-full rounded-md shadow-lg"
                 onLoad={() => setLoading(false)}
                 allowFullScreen></iframe>
@@ -494,6 +497,7 @@ export default function MyBucket() {
           </div>
         </div>
       )}
+      <Toaster position="bottom-center" reverseOrder={false} />
     </>
   );
 }

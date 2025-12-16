@@ -36,12 +36,12 @@ export default function DashboardLayout({
   };
 
   useEffect(() => {
-    fetchDataFromAPI('users/profile', 'get', '', user)
+    fetchDataFromAPI('user/profile', 'get', '', user)
       .then((res) => {
         console.log('res', res);
-        setUserId(res.user?._id);
-        formik.setFieldValue('name', res?.user?.name);
-        formik.setFieldValue('email', res?.user?.email);
+        setUserId(res.data?.id);
+        formik.setFieldValue('name', res?.data?.name);
+        formik.setFieldValue('email', res?.data?.email);
       })
       .catch((error) => {
         console.log('error', error);
@@ -92,7 +92,7 @@ export default function DashboardLayout({
         };
 
         setLoading(true);
-        fetchDataFromAPI(`users/profile`, 'put', body, user)
+        fetchDataFromAPI(`user/profile`, 'post', body, user)
           .then((response) => {
             console.log('admin login response: ', response);
             setLoading(false);

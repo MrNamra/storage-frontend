@@ -18,7 +18,7 @@ export function StorageMetrics() {
 
   const dashboardApi = () => {
     setLoading(true);
-    fetchDataFromAPI('users/dashboard', 'get', '', user)
+    fetchDataFromAPI('user/dashboard', 'get', '', user)
       .then((res) => {
         console.log('res', res);
         setDashboard(res.data);
@@ -32,26 +32,26 @@ export function StorageMetrics() {
   };
 
   const metrics = [
-    {
-      title: 'Storage Used',
-      value: dashboard?.totalStorage?.toFixed(2) || 0 + 'MB',
-      total: '1 TB',
-      progress: 45.82,
-      icon: HardDrive,
-      color: 'text-teal-400',
-    },
+    // {
+    //   title: 'Storage Used',
+    //   value: dashboard?.totalStorage?.toFixed(2) || 0 + 'MB',
+    //   total: '1 TB',
+    //   progress: 45.82,
+    //   icon: HardDrive,
+    //   color: 'text-teal-400',
+    // },
     {
       title: 'Total Buckets',
-      value: dashboard?.totalBuckets,
+      value: dashboard?.bucket?.length,
       icon: Database,
       color: 'text-purple-600',
     },
-    {
-      title: 'Total Files',
-      value: dashboard?.totalFiles,
-      icon: Files,
-      color: 'text-orange-400',
-    },
+    // {
+    //   title: 'Total Files',
+    //   value: dashboard?.totalFiles,
+    //   icon: Files,
+    //   color: 'text-orange-400',
+    // },
     // {
     //   title: 'Recent Activity',
     //   value: '24',

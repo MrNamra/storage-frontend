@@ -32,6 +32,8 @@ import moment from "moment";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
 import toast, { Toaster } from "react-hot-toast";
+import { front_url } from "../../lib/api"
+import { base_url } from "../../lib/api"
 export function BucketList() {
   const user = JSON.parse(getUser());
 
@@ -80,7 +82,7 @@ export function BucketList() {
   }, []);
 
   const renderTableBody = () => {
-    fetchDataFromAPI("users/dashboard", "get", "", user)
+    fetchDataFromAPI("user/dashboard", "get", "", user)
       .then((res) => {
         console.log("res", res);
         setBuckets(res?.data?.bucket);
@@ -138,14 +140,16 @@ export function BucketList() {
   // };
 
   const handleShreStop = (code) => {
-    fetchDataFromAPI(`buckets/end-share/${code}`, "delete", "", user)
+    fetchDataFromAPI(`bucket/end-share/${code}`, "post", "", user)
       .then((res) => {
-        console.log("response:", res);
+        toast.success(res?.message);
+        // console.log("response:", res);
 
         // setLoading(false); // Set loading state to false
         renderTableBody(); // Refresh the bucket list
       })
       .catch((error) => {
+        toast.error(res?.message);
         console.error("Error updating bucket:", error);
         setLoading(false); // Set loading state to false
         if (error?.status === 401) {
@@ -169,15 +173,16 @@ export function BucketList() {
     setLoading(true); // Set loading state to true
 
     const body = {
-      bucketName,
+      name: bucketName,
     };
 
-    fetchDataFromAPI(`buckets/edit/${editingBucketId}`, "put", body, user)
+    fetchDataFromAPI(`bucket/edit/${editingBucketId}`, "post", body, user)
       .then((res) => {
         console.log("Edit response:", res);
         setIsModalOpen(false); // Close modal
         setLoading(false); // Set loading state to false
         renderTableBody(); // Refresh the bucket list
+        toast.success(res?.message)
       })
       .catch((error) => {
         console.error("Error updating bucket:", error);
@@ -186,6 +191,7 @@ export function BucketList() {
           // Perform logout on unauthorized error
           logout();
         } else {
+          toast.success(error?.response?.data?.message)
           setError("An error occurred while updating the bucket.");
         }
       });
@@ -194,25 +200,26 @@ export function BucketList() {
   const handleShareApi = (e) => {
     e.preventDefault();
 
-    if (!bucketPassword.trim()) {
-      setError("Bucket password is required.");
-      return;
-    }
+    // if (!bucketPassword.trim()) {
+    //   setError("Bucket password is required.");
+    //   return;
+    // }
 
     setError("");
     setLoading(true); // Set loading state to true
 
     const body = {
-      bucketId: editingBucketId,
+      bucket_id: editingBucketId,
       password: bucketPassword,
     };
 
-    fetchDataFromAPI(`buckets/share`, "post", body, user)
+    fetchDataFromAPI(`bucket/share`, "post", body, user)
       .then(async (res) => {
-        console.log("Edit response:", res);
+        
+        toast.success(res?.message);
 
         // const url = `http://localhost:5173/bucket/${res.code}`;
-        const url = `https://cloud-valut.netlify.app/bucket/${res.code}`;
+        const url = `${base_url}/bucket/${res?.data?.code}`;
 
         if (url && isValidURL(url)) {
           // Copy the URL to the clipboard
@@ -249,7 +256,7 @@ export function BucketList() {
   };
 
   const btnCopy = async (code) => {
-    const url = `https://cloud-valut.netlify.app/bucket/${code}`;
+    const url = `${ front_url }/bucket/${code}`;
 
     if (url && isValidURL(url)) {
       // Copy the URL to the clipboard
@@ -314,19 +321,19 @@ export function BucketList() {
                   ))}
               </div>
             </TableHead>
-            <TableHead>Size</TableHead>
+            {/* <TableHead>Size</TableHead> */}
             <TableHead>Status</TableHead>
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead className="w-[50px]">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {buckets.map((bucket) => (
-            <TableRow key={bucket._id}>
-              <TableCell className="font-medium">{bucket.bucketName}</TableCell>
+            <TableRow key={bucket.id}>
+              <TableCell className="font-medium" onClick={() => handleView(bucket?.id)} >{bucket.bucketName}</TableCell>
               <TableCell>
                 {moment(bucket.createdAt).format("DD/MM/YYYY")}
               </TableCell>
-              <TableCell>{bucket.storage?.toFixed(2)}</TableCell>
+              {/* <TableCell>{bucket.storage?.toFixed(2)}</TableCell> */}
               <TableCell>
                 {bucket?.code !== null ? (
                   <>
@@ -335,12 +342,12 @@ export function BucketList() {
                       onClick={() => btnCopy(bucket?.code)}
                       className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
                     >
-                      Active <Copy size={15} className="ms-1" />
+                      Shared <Copy size={15} className="ms-1" />
                     </span>
                   </>
                 ) : (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    In Active
+                    Private
                   </span>
                 )}
               </TableCell>
@@ -361,7 +368,7 @@ export function BucketList() {
 
                     {bucket?.code === null && (
                       <DropdownMenuItem
-                        onClick={() => handleShare(bucket?._id)}
+                        onClick={() => handleShare(bucket?.id)}
                       >
                         <Share className="h-4 w-4 mr-2" />
                         Share
@@ -370,7 +377,7 @@ export function BucketList() {
 
                     <DropdownMenuItem
                       onClick={() =>
-                        handleEdit(bucket?._id, bucket?.bucketName)
+                        handleEdit(bucket?.id, bucket?.bucketName)
                       }
                     >
                       <Edit2 className="h-4 w-4 mr-2" />
@@ -379,7 +386,7 @@ export function BucketList() {
 
                     <DropdownMenuItem
                       // className="text-red-600"
-                      onClick={() => handleView(bucket?._id)}
+                      onClick={() => handleView(bucket?.id)}
                     >
                       <View className="h-4 w-4 mr-2" />
                       View
@@ -387,7 +394,7 @@ export function BucketList() {
 
                     <DropdownMenuItem
                       className="text-red-600"
-                      onClick={() => handleDelete(bucket?._id)}
+                      onClick={() => handleDelete(bucket?.id)}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete

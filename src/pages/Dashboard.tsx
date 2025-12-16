@@ -36,9 +36,9 @@ export default function Dashboard() {
       return;
     }
 
-    const body = {bucketName: bucketName};
+    const body = {name: bucketName};
     setLoading(true);
-    fetchDataFromAPI('buckets/create', 'post', body, user)
+    fetchDataFromAPI('bucket/create', 'post', body, user)
       .then((res) => {
         console.log('res', res);
         console.log('Bucket Name:', bucketName);

@@ -49,10 +49,11 @@ export default function SignUp() {
           name: values.name,
           email: values?.email,
           password: values?.password,
+          password_confirmation: values?.conpassword,
         };
 
         setLoading(true);
-        fetchDataFromAPI("users/register", "post", body, "")
+        fetchDataFromAPI("register", "post", body, "")
           .then((response) => {
             console.log("admin login response: ", response);
             navigate("/login");

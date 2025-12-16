@@ -44,10 +44,10 @@ export default function Login() {
           password: values?.password,
         };
         setLoading(true);
-        fetchDataFromAPI('users/login', 'post', body, '')
+        fetchDataFromAPI('login', 'post', body, '')
           .then((response:any) => {
             console.log('admin login response: ', response);
-            saveUserLocally(JSON.stringify(response?.token));
+            saveUserLocally(JSON.stringify(response?.data?.token));
             setLoading(false);
 
             navigate('/dashboard');
