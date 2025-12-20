@@ -7,6 +7,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import {useState} from 'react';
 import {fetchDataFromAPI} from '@/lib/api';
 import {getUser} from '@/lib/constants';
+import toast, { Toaster } from "react-hot-toast";
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,6 +42,7 @@ export default function Dashboard() {
     fetchDataFromAPI('bucket/create', 'post', body, user)
       .then((res) => {
         console.log('res', res);
+        toast.success(res?.message);
         console.log('Bucket Name:', bucketName);
         setIsModalOpen(false);
         setLoading(false);
@@ -49,8 +51,9 @@ export default function Dashboard() {
       .catch((error) => {
         console.log('error', error);
         console.log('Bucket Name:', bucketName);
+        setError(error?.response?.data?.message);
         setLoading(false);
-        setIsModalOpen(false);
+        // setIsModalOpen(false);
       });
 
     // Handle form submission logic here (e.g., API call)
@@ -143,6 +146,7 @@ export default function Dashboard() {
           </div>
         )}
       </DashboardLayout>
+      <Toaster position="top-right" reverseOrder={false} />
     </>
   );
 }

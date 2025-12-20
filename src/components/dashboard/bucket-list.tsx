@@ -98,7 +98,7 @@ export function BucketList() {
   };
 
   const handleDelete = (id) => {
-    fetchDataFromAPI(`buckets/${id}`, "delete", "", user)
+    fetchDataFromAPI(`bucket/delete/${id}`, "post", "", user)
       .then((res) => {
         console.log("res", res);
         renderTableBody();

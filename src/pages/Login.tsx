@@ -43,6 +43,7 @@ export default function Login() {
           email: values?.email,
           password: values?.password,
         };
+        setMessage(null);
         setLoading(true);
         fetchDataFromAPI('login', 'post', body, '')
           .then((response:any) => {

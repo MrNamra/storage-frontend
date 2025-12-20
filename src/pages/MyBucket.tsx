@@ -34,6 +34,7 @@ export default function MyBucket() {
   const user = JSON.parse(getUser());
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteEnable, setIsDeleteEnable] = useState(false);
   const [bucketName, setBucketName] = useState('');
   const [error, setError] = useState('');
   const [bucket, setBucket] = useState([]);
@@ -45,9 +46,11 @@ export default function MyBucket() {
   const [fileId, setFileID] = useState();
   const [showPreView, setShowPreView] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [checkedFiles, setCheckedFiles] = useState([]);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const [totlaFile, setTotalFile] = useState(0);
-  const [totlaStorage, setStorage] = useState(0);
+  // const [totlaStorage, setStorage] = useState(0);
   const [showUploader, setShowUploader] = useState(false);
 
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -55,6 +58,9 @@ export default function MyBucket() {
   useEffect(() => {
     mybucket(currentPage);
   }, [currentPage]);
+  useEffect(() => {
+    setCheckedFiles([]);
+  }, [bucket]);
 
   const mybucket = (page) => {
     setLoading(true);
@@ -122,6 +128,7 @@ export default function MyBucket() {
         setUploadProgress(i);
         await new Promise((resolve) => setTimeout(resolve, 200)); // Simulate delay
       }
+      toast.success(res?.message);
       setSelectedFiles([]);
 
       // After upload completion
@@ -134,6 +141,10 @@ export default function MyBucket() {
       setLoading(false);
     }
   };
+
+  const handleDeleteBtn = () => {
+
+  }
 
   // Handle page change
   const handlePageChange = (page) => {
@@ -189,6 +200,29 @@ export default function MyBucket() {
     setLoading(true);
   };
 
+  const toggleCheckbox = (fileId) => {
+    setCheckedFiles((prev) =>
+      prev.includes(fileId)
+        ? prev.filter((id) => id !== fileId)
+        : [...prev, fileId]
+    );
+  };
+  const handleBulkDelete = () => {
+    fetchDataFromAPI(`bucket/${params?.id}/delete-file`, 'post', { file_id: checkedFiles }, user)
+      .then((res) => {
+        // console.log('res', res);
+        toast.success(res?.message)
+        mybucket();
+        setCheckedFiles([])
+        setLoading(false);
+      })
+      .catch((error) => {
+        setLoading(false);
+        toast.error(res?.message)
+
+        console.log('error', error);
+      });
+  }
   const handleDelete = (id) => {
     console.log('id', id);
     setLoading(true);
@@ -212,24 +246,24 @@ export default function MyBucket() {
     setSelectedFiles((prevFiles) => [...prevFiles, ...files]);
   };
 
-  const formatStorageSize = (sizeInMB) => {
-    if (sizeInMB >= 1024) {
-      // Convert MB to GB if size is 1024 MB or more
-      return `${(sizeInMB / 1024)?.toFixed(2)} GB`;
-    }
-    // Otherwise, show it in MB
-    return `${sizeInMB?.toFixed(2)} MB`;
-  };
+  // const formatStorageSize = (sizeInMB) => {
+  //   if (sizeInMB >= 1024) {
+  //     // Convert MB to GB if size is 1024 MB or more
+  //     return `${(sizeInMB / 1024)?.toFixed(2)} GB`;
+  //   }
+  //   // Otherwise, show it in MB
+  //   return `${sizeInMB?.toFixed(2)} MB`;
+  // };
 
   return (
     <>
-      {/*
+      
       {loading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <span className="loader h-8 w-8 border-4 border-t-purple-500 border-white rounded-full animate-spin"></span>
         </div>
       )}
-      */}
+     
 
       <DashboardLayout>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -324,16 +358,16 @@ export default function MyBucket() {
                 </ul>
               </div>
             )}
-            {/*
-  {loading && (
-    <div className="mt-4">
-    <Progress value={uploadProgress} className="h-2" />
-    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-    Uploading... {uploadProgress}%
-    </p>
-    </div>
-  )}
-  */}
+            
+            {loading && (
+              <div className="mt-4">
+              <Progress value={uploadProgress} className="h-2" />
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+              Uploading... {uploadProgress}%
+              </p>
+              </div>
+            )}
+ 
 
             {/* Upload Button */}
             <button
@@ -357,6 +391,15 @@ export default function MyBucket() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>
+                    <Button
+                      variant="destructive"
+                      disabled={checkedFiles.length == 0}
+                      onClick={() => setShowConfirm(true)}
+                    >
+                      Delete ({checkedFiles.length})
+                    </Button>
+                  </TableHead>
                   <TableHead className="w-[400px]">
                     <Button
                       variant="ghost"
@@ -376,11 +419,18 @@ export default function MyBucket() {
               <TableBody>
                 {bucket?.map((file, index) => {
                   return (
-                    <TableRow
-                      key={file?.id}
+                    <TableRow>
+                      <TableCell className="text-gray-500 dark:text-gray-400">
+                        <input
+                          type="checkbox"
+                          checked={checkedFiles.includes(file.msg_id)}
+                          onChange={() => toggleCheckbox(file.msg_id)}
+                          className="w-4 h-4 accent-purple-600 cursor-pointer"
+                        />
+                      </TableCell>
+                      <TableCell key={file?.msg_id}
                       role="button"
                       onClick={() => preView(index)}>
-                      <TableCell>
                         <div className="flex items-center space-x-3">
                           {/* <span className="font-medium dark:text-white">
                             {file.file_name}
@@ -497,6 +547,40 @@ export default function MyBucket() {
           </div>
         </div>
       )}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-[400px]">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Confirm Delete
+            </h2>
+
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+              Are you sure you want to delete <b>{checkedFiles.length}</b> file(s)?
+              This action cannot be undone.
+            </p>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowConfirm(false)}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setShowConfirm(false);
+                  handleBulkDelete();
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Toaster position="bottom-center" reverseOrder={false} />
     </>
   );
