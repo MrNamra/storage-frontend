@@ -20,11 +20,12 @@ export const fetchDataFromAPI = <T>(
   method: Method,
   data?: any,
   token?: string,
-  onUploadProgress?: (progressEvent: AxiosProgressEvent) => void
+  onUploadProgress?: (progressEvent: AxiosProgressEvent) => void,
+  responseType: 'json' | 'blob' | 'arraybuffer' | 'text' = 'json'
 ): Promise<T> => {
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {
-      Accept: 'application/json',
+      Accept: responseType === 'blob' ? '*/*' : 'application/json',
     };
 
     if (token) {
@@ -37,9 +38,19 @@ export const fetchDataFromAPI = <T>(
       headers,
       data,
       onUploadProgress,
+      responseType,
     })
-      .then((response: ApiResponse<T>) => {
-        resolve(response.data);
+      .then((response: any) => {
+        if (responseType === 'blob') {
+          // For blob responses, return the full response object to access headers
+          resolve({
+            data: response.data,
+            headers: response.headers,
+            status: response.status,
+          } as T);
+        } else {
+          resolve(response.data);
+        }
       })
       .catch((error) => {
         reject(error);

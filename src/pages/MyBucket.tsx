@@ -1,4 +1,4 @@
-import {Plus, HardDrive, Upload, File} from 'lucide-react';
+import {Plus, Download, Upload, File} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {StorageMetrics} from '@/components/dashboard/storage-metrics';
 import {BucketList} from '@/components/dashboard/bucket-list';
@@ -240,6 +240,127 @@ export default function MyBucket() {
         console.log('error', error);
       });
   };
+  // Check if file is streamable (video, PDF, or image)
+  const isStreamable = (file: any): boolean => {
+    if (!file) return false;
+    const mimeType = file.mime_type || '';
+    const fileType = file.type || '';
+    
+    // Check for images
+    if (mimeType.startsWith('image/') || fileType === 'photo') {
+      return true;
+    }
+    
+    // Check for videos
+    if (mimeType.startsWith('video/') || fileType === 'video') {
+      return true;
+    }
+    
+    // Check for PDFs
+    if (mimeType === 'application/pdf') {
+      return true;
+    }
+    
+    return false;
+  };
+
+
+  const handleDownload = async (fileId: string, fileName?: string, file?: any) => {
+    try {
+      setLoading(true);
+      
+      // Check if file is streamable (video, PDF, or image)
+      if (file && isStreamable(file)) {
+        // For streamable files, open in preview modal or new tab
+        const fileIndex = bucket.findIndex((f: any) => f.msg_id === fileId);
+        if (fileIndex !== -1) {
+          setFileID(fileIndex);
+          setShowPreView(true);
+        } else {
+          // If not in current bucket view, open stream URL in new tab
+          const streamUrl = getStreamUrl(fileId);
+          window.open(streamUrl, '_blank');
+        }
+        toast.success('Opening file for streaming...');
+        return;
+      }
+      
+      // For non-streamable files, download normally
+      const response: any = await fetchDataFromAPI(
+        'bucket/file/download',
+        'post',
+        {
+          file_id: fileId,
+          bucket_id: params?.id,
+        },
+        user,
+        undefined,
+        'blob'
+      );
+
+      // Extract blob and headers from response
+      const blob = response.data;
+      const headers = response.headers || {};
+      
+      // Get the filename - prioritize fileName parameter, then Content-Disposition header, then default
+      let filename = fileName || 'download';
+      
+      // Try to extract from Content-Disposition header if fileName not provided
+      if (!fileName) {
+        const contentDisposition = headers['content-disposition'] || headers['Content-Disposition'];
+        if (contentDisposition) {
+          // Try multiple patterns to extract filename
+          // Pattern 1: filename="value" or filename='value'
+          let filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
+          if (filenameMatch && filenameMatch[1]) {
+            // Remove quotes if present and decode URL encoding
+            filename = filenameMatch[1].replace(/^['"]|['"]$/g, '').trim();
+            // Decode URL encoding (e.g., %20 to space)
+            try {
+              filename = decodeURIComponent(filename);
+            } catch (e) {
+              // If decoding fails, use as is
+            }
+          }
+        }
+      }
+      
+      // Ensure filename has an extension if it's missing
+      if (filename === 'download' || !filename.includes('.')) {
+        // Try to get extension from mime type or use default
+        const contentType = headers['content-type'] || headers['Content-Type'] || '';
+        if (contentType.includes('image/jpeg') || contentType.includes('image/jpg')) {
+          filename = filename === 'download' ? 'image.jpg' : `${filename}.jpg`;
+        } else if (contentType.includes('image/png')) {
+          filename = filename === 'download' ? 'image.png' : `${filename}.png`;
+        } else if (contentType.includes('application/pdf')) {
+          filename = filename === 'download' ? 'document.pdf' : `${filename}.pdf`;
+        }
+      }
+      
+      // Create a temporary URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('File downloaded successfully');
+    } catch (error: any) {
+      console.error('Download error:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to download file';
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFileChange = (event) => {
     const files = Array.from(event.target.files); // Convert FileList to array
@@ -473,6 +594,12 @@ export default function MyBucket() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
+                              onClick={() => handleDownload(file?.msg_id, file?.file_name, file)}
+                              className="text-blue-600 dark:text-red-400">
+                                <Download className="h-4 w-4 mr-2" />
+                                {file && isStreamable(file) ? 'View/Stream' : 'Download'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               onClick={() => handleDelete(file?.msg_id)}
                               className="text-red-600 dark:text-red-400">
                               <Trash2 className="h-4 w-4 mr-2" />
@@ -509,35 +636,117 @@ export default function MyBucket() {
         </div>
       </DashboardLayout>
 
-      {showPreView && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="relative bg-white bg-opacity-50 rounded-lg p-1 w-full h-full max-w-none flex flex-col">
+      {showPreView && currentFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
+          <div className="relative bg-black rounded-lg p-1 w-full h-full max-w-none flex flex-col">
             <button
-              className="absolute top-4 right-4 text-white text-2xl font-bold bg-black bg-opacity-50 rounded-full w-10 h-10 flex items-center justify-center z-50"
+              className="absolute top-4 right-4 text-white text-2xl font-bold bg-black bg-opacity-70 rounded-full w-10 h-10 flex items-center justify-center z-50 hover:bg-opacity-90"
               onClick={handleCloseModal}
               aria-label="Close">
               ✕
             </button>
 
-            <div className="flex items-center justify-center relative flex-grow">
+            <div className="flex items-center justify-center relative flex-grow p-4">
               {currentIndex > 0 && (
                 <button
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white text-2xl font-bold bg-black bg-opacity-50 rounded-full w-12 h-12 flex items-center justify-center z-50"
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white text-2xl font-bold bg-black bg-opacity-70 rounded-full w-12 h-12 flex items-center justify-center z-50 hover:bg-opacity-90"
                   onClick={handlePreviousImage}
                   aria-label="Previous">
                   ◀
                 </button>
               )}
 
-              <iframe
-                src={currentFile?.thumbnail}
-                className="w-full h-full rounded-md shadow-lg"
-                onLoad={() => setLoading(false)}
-                allowFullScreen></iframe>
+              {isStreamable(currentFile) ? (
+                (() => {
+                  const mimeType = currentFile?.mime_type || '';
+                  const fileType = currentFile?.type || '';
+                  const streamUrl = currentFile?.stream_url || currentFile?.thumbnail;
+                  
+                  // Debug logging
+                  console.log('Streaming file:', {
+                    mimeType,
+                    fileType,
+                    streamUrl,
+                    file: currentFile
+                  });
+                  
+                  if (!streamUrl) {
+                    return (
+                      <div className="w-full h-full flex items-center justify-center text-white">
+                        <p>Stream URL not available</p>
+                      </div>
+                    );
+                  }
+                  
+                  // For video files
+                  if (mimeType.startsWith('video/') || fileType === 'video') {
+                    return (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <video
+                          controls
+                          autoPlay
+                          className="max-w-full max-h-full rounded-md shadow-lg"
+                          onLoadStart={() => setLoading(false)}
+                          onError={(e) => {
+                            setLoading(false);
+                            console.error('Video load error:', e);
+                            toast.error('Failed to load video. URL: ' + streamUrl);
+                          }}>
+                          <source src={streamUrl} type={mimeType} />
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    );
+                  }
+                  
+                  // For PDF files
+                  if (mimeType === 'application/pdf') {
+                    return (
+                      <iframe
+                        src={streamUrl}
+                        className="w-full h-full rounded-md shadow-lg"
+                        onLoad={() => setLoading(false)}
+                        onError={(e) => {
+                          setLoading(false);
+                          console.error('PDF load error:', e);
+                          toast.error('Failed to load PDF. URL: ' + streamUrl);
+                        }}
+                        title={currentFile.file_name || 'PDF Viewer'}
+                      />
+                    );
+                  }
+                  
+                  // For image files
+                  if (mimeType.startsWith('image/') || fileType === 'photo') {
+                    return (
+                      <img
+                        src={streamUrl}
+                        alt={currentFile.file_name || 'Image'}
+                        className="max-w-full max-h-full object-contain rounded-md shadow-lg"
+                        onLoad={() => setLoading(false)}
+                        onError={(e) => {
+                          setLoading(false);
+                          console.error('Image load error:', e, 'URL:', streamUrl);
+                          toast.error('Failed to load image. URL: ' + streamUrl);
+                        }}
+                      />
+                    );
+                  }
+                  
+                  return null;
+                })()
+              ) : (
+                <iframe
+                  src={currentFile?.thumbnail}
+                  className="w-full h-full rounded-md shadow-lg"
+                  onLoad={() => setLoading(false)}
+                  allowFullScreen
+                />
+              )}
 
               {currentIndex < bucket?.length - 1 && (
                 <button
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white text-2xl font-bold bg-black bg-opacity-50 rounded-full w-12 h-12 flex items-center justify-center z-50"
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white text-2xl font-bold bg-black bg-opacity-70 rounded-full w-12 h-12 flex items-center justify-center z-50 hover:bg-opacity-90"
                   onClick={handleNextImage}
                   aria-label="Next">
                   ▶
