@@ -245,19 +245,20 @@ export default function MyBucket() {
     if (!file) return false;
     const mimeType = file.mime_type || '';
     const fileType = file.type || '';
+    const fileName = (file.file_name || '').toLowerCase();
     
     // Check for images
-    if (mimeType.startsWith('image/') || fileType === 'photo') {
+    if (mimeType.startsWith('image/') || fileType === 'photo' || /\.(heic|heif|jpg|jpeg|png|gif|webp)$/i.test(fileName)) {
       return true;
     }
     
     // Check for videos
-    if (mimeType.startsWith('video/') || fileType === 'video') {
+    if (mimeType.startsWith('video/') || fileType === 'video' || /\.(mov|mp4|m4v|mkv|webm|avi|3gp|flv|wmv)$/i.test(fileName)) {
       return true;
     }
     
     // Check for PDFs
-    if (mimeType === 'application/pdf') {
+    if (mimeType === 'application/pdf' || fileName.endsWith('.pdf')) {
       return true;
     }
     
@@ -671,20 +672,27 @@ export default function MyBucket() {
                   }
                   
                   // For video files
-                  if (mimeType.startsWith('video/') || fileType === 'video') {
+                  const fileNameLower = (currentFile?.file_name || '').toLowerCase();
+                  const isVideo = mimeType.startsWith('video/') || fileType === 'video' || /\.(mov|mp4|m4v|mkv|webm|avi|3gp|flv|wmv)$/i.test(fileNameLower);
+                  if (isVideo) {
                     return (
                       <div className="w-full h-full flex items-center justify-center">
                         <video
+                          key={streamUrl}
                           controls
                           autoPlay
-                          className="max-w-full max-h-full rounded-md shadow-lg"
-                          onLoadStart={() => setLoading(false)}
+                          playsInline
+                          className="max-w-full max-h-[85vh] rounded-md shadow-lg"
+                          onLoadedData={() => setLoading(false)}
+                          onCanPlay={() => setLoading(false)}
                           onError={(e) => {
                             setLoading(false);
                             console.error('Video load error:', e);
-                            toast.error('Failed to load video. URL: ' + streamUrl);
+                            toast.error('Failed to load video.');
                           }}>
-                          <source src={streamUrl} type={mimeType} />
+                          <source src={streamUrl} type="video/mp4" />
+                          <source src={streamUrl} type={mimeType || 'video/mp4'} />
+                          <source src={streamUrl} />
                           Your browser does not support the video tag.
                         </video>
                       </div>

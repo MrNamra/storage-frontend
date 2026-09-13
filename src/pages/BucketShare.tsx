@@ -600,13 +600,46 @@ const BucketShare = () => {
                   )}
 
                   {currentFile && (
-                    <img
-                      src={currentFile.stream_url || currentFile.thumbnail}
-                      alt={currentFile.file_name || 'Preview'}
-                      className="max-w-full max-h-[85vh] object-contain rounded-md shadow-lg"
-                      onLoad={() => setLoading(false)}
-                      onError={() => setLoading(false)}
-                    />
+                    (() => {
+                      const mimeType = (currentFile.mime_type || '').toLowerCase();
+                      const fileType = (currentFile.type || '').toLowerCase();
+                      const fileName = (currentFile.file_name || '').toLowerCase();
+                      const isVideo = mimeType.startsWith('video/') || fileType === 'video' || /\.(mov|mp4|m4v|mkv|webm|avi|3gp|flv|wmv)$/i.test(fileName);
+                      const streamUrl = currentFile.stream_url || currentFile.thumbnail;
+
+                      if (isVideo) {
+                        return (
+                          <video
+                            key={streamUrl}
+                            controls
+                            autoPlay
+                            playsInline
+                            className="max-w-full max-h-[85vh] rounded-md shadow-lg"
+                            onLoadedData={() => setLoading(false)}
+                            onCanPlay={() => setLoading(false)}
+                            onError={(e) => {
+                              setLoading(false);
+                              console.error('Video load error:', e);
+                              toast.error('Failed to load video');
+                            }}>
+                            <source src={streamUrl} type="video/mp4" />
+                            <source src={streamUrl} type={mimeType || 'video/mp4'} />
+                            <source src={streamUrl} />
+                            Your browser does not support the video tag.
+                          </video>
+                        );
+                      }
+
+                      return (
+                        <img
+                          src={streamUrl}
+                          alt={currentFile.file_name || 'Preview'}
+                          className="max-w-full max-h-[85vh] object-contain rounded-md shadow-lg"
+                          onLoad={() => setLoading(false)}
+                          onError={() => setLoading(false)}
+                        />
+                      );
+                    })()
                   )}
 
                   {currentIndex < bucket?.length - 1 && (
