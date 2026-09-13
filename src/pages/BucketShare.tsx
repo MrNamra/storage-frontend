@@ -8,6 +8,7 @@ import {
   Image as ImageIcon,
   File,
   Cloud,
+  Download,
 } from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Progress} from '@/components/ui/progress';
@@ -226,6 +227,82 @@ const BucketShare = () => {
     setLoading(true);
   };
 
+  const handleDownload = async (fileId: string, fileName?: string) => {
+    try {
+      setLoading(true);
+      const response: any = await fetchDataFromAPI(
+        `files/download/${params?.id}`,
+        'post',
+        {
+          file_id: fileId,
+          password: password,
+        },
+        '',
+        undefined,
+        'blob'
+      );
+
+      const blob = response.data;
+      const headers = response.headers || {};
+      let filename = fileName || 'download';
+
+      if (!fileName) {
+        const contentDisposition = headers['content-disposition'] || headers['Content-Disposition'];
+        if (contentDisposition) {
+          const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;\n]*)/i);
+          if (utf8Match && utf8Match[1]) {
+            try {
+              filename = decodeURIComponent(utf8Match[1].trim());
+            } catch (e) {}
+          } else {
+            let filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
+            if (filenameMatch && filenameMatch[1]) {
+              filename = filenameMatch[1].replace(/^['"]|['"]$/g, '').trim();
+              try {
+                filename = decodeURIComponent(filename);
+              } catch (e) {}
+            }
+          }
+        }
+      }
+
+      if (filename === 'download' || !filename.includes('.')) {
+        const contentType = headers['content-type'] || headers['Content-Type'] || '';
+        if (contentType.includes('image/jpeg') || contentType.includes('image/jpg')) {
+          filename = filename === 'download' ? 'image.jpg' : `${filename}.jpg`;
+        } else if (contentType.includes('image/png')) {
+          filename = filename === 'download' ? 'image.png' : `${filename}.png`;
+        } else if (contentType.includes('application/pdf')) {
+          filename = filename === 'download' ? 'document.pdf' : `${filename}.pdf`;
+        }
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+
+      setTimeout(() => {
+        try {
+          if (link.parentNode) {
+            document.body.removeChild(link);
+          }
+          window.URL.revokeObjectURL(url);
+        } catch (e) {}
+      }, 3000);
+
+      toast.success('File downloaded successfully');
+    } catch (error: any) {
+      console.error('Download error:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to download file';
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // if (!showPreView) return null;
 
   const formatStorageSize = (sizeInMB) => {
@@ -391,40 +468,25 @@ const BucketShare = () => {
                   <TableHead>File Name</TableHead>
 
                   <TableHead>Date</TableHead>
-                  {/* 
-                <TableHead className="w-[70px]"></TableHead>
-                */}
+                  <TableHead className="w-[80px] text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {bucket?.map((file, index) => {
                   return (
                     <TableRow
-                      key={file?.id}
+                      key={file?.id || index}
                       role="button"
                       onClick={() => preView(index)}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
-                          {/*
-                          <span className="font-medium dark:text-white">
-                            {file.name}
-                          </span>
-                        <img
-                        src={`http://storage.raju.serv00.net/api/thumbnil/${file.fileId}/awards-logo.png`}
-                        alt={`${file.fileName}`}
-                        style={{width: '100px', height: 'auto'}}
-                        />
-                        */}
-                          {/*
-                      <ImageLoader key={file.fileId} fileId={file.fileId} />
-                        */}
                           <img
                             src={file.thumbnail}
-                            alt="Base64 Thumbnail"
+                            alt="Thumbnail"
                             style={{
                               width: '100px',
                               height: '100px',
-                              objectFit: 'cover', // or 'contain' if you want to preserve the aspect ratio within the specified dimensions
+                              objectFit: 'cover',
                             }}
                           />
                         </div>
@@ -437,31 +499,16 @@ const BucketShare = () => {
                         {moment(file.uploadedAt).format('YYYY-MM-DD')}
                       </TableCell>
 
-                      {/*
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-5 w-5" />
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-purple-600 hover:text-purple-800 hover:bg-purple-100"
+                          onClick={() => handleDownload(file.msg_id, file.file_name)}
+                          title="Download File">
+                          <Download className="h-5 w-5" />
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Share2 className="h-4 w-4 mr-2" />
-                          Share
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600 dark:text-red-400">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                    */}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -546,11 +593,15 @@ const BucketShare = () => {
                     </button>
                   )}
 
-                  <iframe
-                    src={currentFile?.thumbnail}
-                    className="w-full h-full rounded-md shadow-lg"
-                    onLoad={() => setLoading(false)} // Remove loading state once the iframe loads
-                    allowFullScreen></iframe>
+                  {currentFile && (
+                    <img
+                      src={currentFile.stream_url || currentFile.thumbnail}
+                      alt={currentFile.file_name || 'Preview'}
+                      className="max-w-full max-h-[85vh] object-contain rounded-md shadow-lg"
+                      onLoad={() => setLoading(false)}
+                      onError={() => setLoading(false)}
+                    />
+                  )}
 
                   {currentIndex < bucket?.length - 1 && (
                     <button

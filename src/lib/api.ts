@@ -1,10 +1,13 @@
 import axios, {Method, AxiosProgressEvent} from 'axios';
 
-// Development server
-export const base_url = "https://api.raju.serv00.net/api/";
-export const front_url = "https://raju.serv00.net"
-// export const base_url = "http://127.0.0.1:8000/api/";
-// export const front_url = "http://localhost:5173"
+// Base URL and Frontend URL configuration
+export const front_url = typeof window !== 'undefined' && window.location && window.location.origin
+  ? window.location.origin
+  : 'http://localhost:5173';
+
+export const base_url = typeof window !== 'undefined' && window.location && window.location.origin
+  ? (window.location.port === '5173' ? 'http://127.0.0.1:8000/api/' : `${window.location.origin}/api/`)
+  : 'http://127.0.0.1:8000/api/';
 
 interface ApiResponse<T = any> {
   data: T;

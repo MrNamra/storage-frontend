@@ -197,16 +197,36 @@ export function BucketList() {
       });
   };
 
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        console.warn('navigator.clipboard failed, using fallback', err);
+      }
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      return true;
+    } catch (err) {
+      console.error('Copy fallback failed', err);
+      return false;
+    }
+  };
+
   const handleShareApi = (e) => {
     e.preventDefault();
 
-    // if (!bucketPassword.trim()) {
-    //   setError("Bucket password is required.");
-    //   return;
-    // }
-
     setError("");
-    setLoading(true); // Set loading state to true
+    setLoading(true);
 
     const body = {
       bucket_id: editingBucketId,
@@ -214,30 +234,26 @@ export function BucketList() {
     };
 
     fetchDataFromAPI(`bucket/share`, "post", body, user)
-      .then(async (res) => {
-        
-        toast.success(res?.message);
+      .then(async (res: any) => {
+        toast.success(res?.message || 'Bucket shared successfully');
 
-        // const url = `http://localhost:5173/bucket/${res.code}`;
-        const url = `${base_url}/bucket/${res?.data?.code}`;
+        const shareCode = res?.data?.code || res?.code;
+        const origin = front_url || (typeof window !== 'undefined' ? window.location.origin : '');
+        const url = `${origin}/bucket/${shareCode}`;
 
-        if (url && isValidURL(url)) {
-          // Copy the URL to the clipboard
-          await navigator.clipboard.writeText(url);
-          console.log("URL copied to clipboard:", url);
-        } else {
-          console.error("Invalid URL:", url);
+        if (url) {
+          await copyToClipboard(url);
+          toast.success('URL copied to clipboard!');
         }
 
-        setIsModalShare(false); // Close modal
-        setLoading(false); // Set loading state to false
-        renderTableBody(); // Refresh the bucket list
+        setIsModalShare(false);
+        setLoading(false);
+        renderTableBody();
       })
       .catch((error) => {
-        console.error("Error updating bucket:", error);
-        setLoading(false); // Set loading state to false
+        console.error("Error sharing bucket:", error);
+        setLoading(false);
         if (error?.status === 401) {
-          // Perform logout on unauthorized error
           logout();
         } else {
           setError("An error occurred while updating the bucket.");
@@ -248,22 +264,22 @@ export function BucketList() {
   // Helper function to validate the URL
   const isValidURL = (url) => {
     try {
-      new URL(url); // Try to create a URL object
+      new URL(url);
       return true;
     } catch {
-      return false; // Invalid URL
+      return false;
     }
   };
 
   const btnCopy = async (code) => {
-    const url = `${ front_url }/bucket/${code}`;
+    const origin = front_url || (typeof window !== 'undefined' ? window.location.origin : '');
+    const url = `${origin}/bucket/${code}`;
 
-    if (url && isValidURL(url)) {
-      // Copy the URL to the clipboard
+    const copied = await copyToClipboard(url);
+    if (copied) {
       toast.success('URL copied to clipboard!');
-      await navigator.clipboard.writeText(url);
     } else {
-      console.error("Invalid URL:", url);
+      toast.error('Failed to copy URL');
     }
   };
 
@@ -340,7 +356,7 @@ export function BucketList() {
                     <span
                       role="button"
                       onClick={() => btnCopy(bucket?.code)}
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 cursor-pointer hover:bg-green-200 transition-colors select-none"
                     >
                       Shared <Copy size={15} className="ms-1" />
                     </span>

@@ -50,7 +50,7 @@ export default function MyBucket() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [totlaFile, setTotalFile] = useState(0);
-  // const [totlaStorage, setStorage] = useState(0);
+  const [totlaStorage, setStorage] = useState(0);
   const [showUploader, setShowUploader] = useState(false);
 
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -269,23 +269,6 @@ export default function MyBucket() {
     try {
       setLoading(true);
       
-      // Check if file is streamable (video, PDF, or image)
-      if (file && isStreamable(file)) {
-        // For streamable files, open in preview modal or new tab
-        const fileIndex = bucket.findIndex((f: any) => f.msg_id === fileId);
-        if (fileIndex !== -1) {
-          setFileID(fileIndex);
-          setShowPreView(true);
-        } else {
-          // If not in current bucket view, open stream URL in new tab
-          const streamUrl = getStreamUrl(fileId);
-          window.open(streamUrl, '_blank');
-        }
-        toast.success('Opening file for streaming...');
-        return;
-      }
-      
-      // For non-streamable files, download normally
       const response: any = await fetchDataFromAPI(
         'bucket/file/download',
         'post',
@@ -310,16 +293,20 @@ export default function MyBucket() {
         const contentDisposition = headers['content-disposition'] || headers['Content-Disposition'];
         if (contentDisposition) {
           // Try multiple patterns to extract filename
-          // Pattern 1: filename="value" or filename='value'
-          let filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
-          if (filenameMatch && filenameMatch[1]) {
-            // Remove quotes if present and decode URL encoding
-            filename = filenameMatch[1].replace(/^['"]|['"]$/g, '').trim();
-            // Decode URL encoding (e.g., %20 to space)
+          // Pattern 1: filename*=UTF-8''...
+          const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;\n]*)/i);
+          if (utf8Match && utf8Match[1]) {
             try {
-              filename = decodeURIComponent(filename);
-            } catch (e) {
-              // If decoding fails, use as is
+              filename = decodeURIComponent(utf8Match[1].trim());
+            } catch (e) {}
+          } else {
+            // Pattern 2: filename="value" or filename='value'
+            let filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
+            if (filenameMatch && filenameMatch[1]) {
+              filename = filenameMatch[1].replace(/^['"]|['"]$/g, '').trim();
+              try {
+                filename = decodeURIComponent(filename);
+              } catch (e) {}
             }
           }
         }
@@ -327,7 +314,6 @@ export default function MyBucket() {
       
       // Ensure filename has an extension if it's missing
       if (filename === 'download' || !filename.includes('.')) {
-        // Try to get extension from mime type or use default
         const contentType = headers['content-type'] || headers['Content-Type'] || '';
         if (contentType.includes('image/jpeg') || contentType.includes('image/jpg')) {
           filename = filename === 'download' ? 'image.jpg' : `${filename}.jpg`;
@@ -348,9 +334,15 @@ export default function MyBucket() {
       document.body.appendChild(link);
       link.click();
       
-      // Clean up
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      // Clean up after 3 seconds to allow browser to read filename
+      setTimeout(() => {
+        try {
+          if (link.parentNode) {
+            document.body.removeChild(link);
+          }
+          window.URL.revokeObjectURL(url);
+        } catch (e) {}
+      }, 3000);
       
       toast.success('File downloaded successfully');
     } catch (error: any) {
@@ -595,9 +587,9 @@ export default function MyBucket() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               onClick={() => handleDownload(file?.msg_id, file?.file_name, file)}
-                              className="text-blue-600 dark:text-red-400">
+                              className="text-blue-600 dark:text-blue-400">
                                 <Download className="h-4 w-4 mr-2" />
-                                {file && isStreamable(file) ? 'View/Stream' : 'Download'}
+                                Download
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleDelete(file?.msg_id)}
@@ -722,7 +714,7 @@ export default function MyBucket() {
                       <img
                         src={streamUrl}
                         alt={currentFile.file_name || 'Image'}
-                        className="max-w-full max-h-full object-contain rounded-md shadow-lg"
+                        className="max-w-full max-h-[85vh] object-contain rounded-md shadow-lg"
                         onLoad={() => setLoading(false)}
                         onError={(e) => {
                           setLoading(false);
@@ -736,11 +728,11 @@ export default function MyBucket() {
                   return null;
                 })()
               ) : (
-                <iframe
+                <img
                   src={currentFile?.thumbnail}
-                  className="w-full h-full rounded-md shadow-lg"
+                  alt={currentFile?.file_name || 'Preview'}
+                  className="max-w-full max-h-[85vh] object-contain rounded-md shadow-lg"
                   onLoad={() => setLoading(false)}
-                  allowFullScreen
                 />
               )}
 
