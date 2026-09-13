@@ -236,7 +236,6 @@ const BucketShare = () => {
         'post',
         {
           file_id: fileId,
-          password: password,
         },
         '',
         undefined,
