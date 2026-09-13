@@ -113,7 +113,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
-      <nav className="bg-white shadow-sm fixed top-0 left-0 right-0 z-50">
+      <nav className="bg-white shadow-sm fixed top-0 left-0 right-0 z-40" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
@@ -155,15 +155,23 @@ export default function DashboardLayout({
 
                 {/* Dropdown Menu */}
                 {showMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
                     <button
                       onClick={handleEditProfile}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:outline-none">
                       Edit Profile
                     </button>
                     <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        (window as any).openCloudVaultGuide?.();
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-purple-700 hover:bg-purple-50 focus:outline-none flex items-center justify-between">
+                      <span>📲 iOS / Android Share Setup</span>
+                    </button>
+                    <button
                       onClick={handleLogout}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:outline-none">
+                      className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100 focus:outline-none border-t border-gray-100">
                       Logout
                     </button>
                   </div>
@@ -175,7 +183,7 @@ export default function DashboardLayout({
       </nav>
 
       {/* Main Content */}
-      <main className="pt-16">
+      <main style={{ paddingTop: 'calc(4rem + env(safe-area-inset-top, 0px))' }}>
         <div className="max-w-7xl mx-auto px-4 py-8">{children}</div>
       </main>
 

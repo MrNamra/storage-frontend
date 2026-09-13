@@ -317,8 +317,14 @@ const BucketShare = () => {
   return (
     <>
       {!checkStatus ? (
-        <div className="min-h-screen bg-gray-50 pt-20 mx-auto px-4 py-8">
-          <nav className="bg-white shadow-sm fixed top-0 left-0 right-0 z-50">
+        <div
+          className="min-h-screen bg-gray-50 mx-auto px-4 py-8"
+          style={{ paddingTop: 'calc(5rem + env(safe-area-inset-top, 0px))' }}
+        >
+          <nav
+            className="bg-white shadow-sm fixed top-0 left-0 right-0 z-40"
+            style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+          >
             <div className="max-w-7xl mx-auto px-4">
               <div className="flex items-center justify-between h-16">
                 {/* Logo */}

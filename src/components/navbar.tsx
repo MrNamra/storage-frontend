@@ -17,9 +17,12 @@ export function Navbar() {
   }, []);
 
   return (
-    <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-      isScrolled ? 'bg-white/80 backdrop-blur-md shadow-sm' : 'bg-transparent'
-    }`}>
+    <nav
+      className={`fixed top-0 left-0 right-0 w-full z-40 transition-all duration-300 ${
+        isScrolled ? 'bg-white/90 backdrop-blur-md shadow-sm' : 'bg-white/80 backdrop-blur-sm sm:bg-transparent'
+      }`}
+      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-2" role='button' onClick={() => window.location.href = '/'}>
@@ -33,7 +36,7 @@ export function Navbar() {
             <Link to="#pricing" onClick={() => document.getElementById('pricing')?.scrollIntoView()} className="text-gray-600 hover:text-gray-900 transition-colors">Pricing</Link>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <Button variant="ghost" asChild>
               <Link to="/login">Log in</Link>
             </Button>
