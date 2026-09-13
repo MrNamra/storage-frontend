@@ -56,6 +56,18 @@ export default function MyBucket() {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleCloseModal();
+      }
+    };
+    if (showPreView) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPreView]);
+
+  useEffect(() => {
     mybucket(currentPage);
   }, [currentPage]);
   useEffect(() => {
@@ -631,22 +643,44 @@ export default function MyBucket() {
       </DashboardLayout>
 
       {showPreView && currentFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
-          <div className="relative bg-black rounded-lg p-1 w-full h-full max-w-none flex flex-col">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md"
+          style={{
+            paddingTop: 'env(safe-area-inset-top, 0px)',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            paddingLeft: 'env(safe-area-inset-left, 0px)',
+            paddingRight: 'env(safe-area-inset-right, 0px)',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleCloseModal();
+          }}
+        >
+          <div className="relative bg-transparent rounded-lg w-full h-full max-w-none flex flex-col">
             <button
-              className="absolute top-4 right-4 text-white text-2xl font-bold bg-black bg-opacity-70 rounded-full w-10 h-10 flex items-center justify-center z-50 hover:bg-opacity-90"
+              type="button"
+              className="absolute z-[60] flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-black/75 hover:bg-black/95 active:scale-95 text-white shadow-xl border border-white/20 backdrop-blur-md cursor-pointer transition-all duration-150"
+              style={{
+                top: 'max(16px, calc(env(safe-area-inset-top, 0px) + 12px))',
+                right: 'max(16px, calc(env(safe-area-inset-right, 0px) + 12px))',
+              }}
               onClick={handleCloseModal}
               aria-label="Close">
-              ✕
+              <span className="text-2xl leading-none select-none font-bold">✕</span>
             </button>
 
-            <div className="flex items-center justify-center relative flex-grow p-4">
+            <div className="flex items-center justify-center relative flex-grow p-4 sm:p-6">
               {currentIndex > 0 && (
                 <button
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white text-2xl font-bold bg-black bg-opacity-70 rounded-full w-12 h-12 flex items-center justify-center z-50 hover:bg-opacity-90"
+                  type="button"
+                  className="absolute z-[60] flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-black/75 hover:bg-black/95 active:scale-95 text-white shadow-xl border border-white/20 backdrop-blur-md cursor-pointer transition-all duration-150"
+                  style={{
+                    left: 'max(12px, calc(env(safe-area-inset-left, 0px) + 12px))',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                  }}
                   onClick={handlePreviousImage}
                   aria-label="Previous">
-                  ◀
+                  <span className="text-xl leading-none select-none">◀</span>
                 </button>
               )}
 
@@ -757,10 +791,16 @@ export default function MyBucket() {
 
               {currentIndex < bucket?.length - 1 && (
                 <button
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white text-2xl font-bold bg-black bg-opacity-70 rounded-full w-12 h-12 flex items-center justify-center z-50 hover:bg-opacity-90"
+                  type="button"
+                  className="absolute z-[60] flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-black/75 hover:bg-black/95 active:scale-95 text-white shadow-xl border border-white/20 backdrop-blur-md cursor-pointer transition-all duration-150"
+                  style={{
+                    right: 'max(12px, calc(env(safe-area-inset-right, 0px) + 12px))',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                  }}
                   onClick={handleNextImage}
                   aria-label="Next">
-                  ▶
+                  <span className="text-xl leading-none select-none">▶</span>
                 </button>
               )}
             </div>

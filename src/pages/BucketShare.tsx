@@ -72,6 +72,18 @@ const BucketShare = () => {
   };
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleCloseModal();
+      }
+    };
+    if (showPreView || showUploader) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPreView, showUploader]);
+
+  useEffect(() => {
     if (params?.id) {
       handleCall(currentPage);
     }
@@ -541,34 +553,39 @@ const BucketShare = () => {
             </div>
           </div>
           {showUploader && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-              <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                <h2 className="text-xl font-semibold mb-4">Password</h2>
-                <form>
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) handleCloseModal();
+              }}
+            >
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-2xl">
+                <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Password Required</h2>
+                <form onSubmit={(e) => handleSubmit(e)}>
                   <div className="space-y-4">
                     <input
-                      type="text"
-                      placeholder="*****"
-                      // className="w-full p-2 border rounded-lg"
+                      type="password"
+                      placeholder="Enter upload password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className={`w-full p-2 border rounded-lg ${
-                        error ? 'border-red-500' : 'border-gray-300'
+                      className={`w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:text-white ${
+                        error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                       }`}
+                      autoFocus
                     />
                     {error && <p className="text-red-500 text-sm">{error}</p>}
                   </div>
-                  <div className="flex justify-end mt-6 space-x-4">
-                    <Button variant="outline" onClick={handleCloseModal}>
+                  <div className="flex justify-end mt-6 space-x-3">
+                    <Button type="button" variant="outline" onClick={handleCloseModal}>
                       Cancel
                     </Button>
                     <Button
-                      onClick={(e) => handleSubmit(e)}
+                      type="submit"
                       className="bg-purple-600 hover:bg-purple-700 flex items-center justify-center"
-                      disabled={loading} // Disable button while loading
+                      disabled={loading}
                     >
                       {loading ? (
-                        <span className="loader  h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
+                        <span className="loader h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
                       ) : (
                         'Upload'
                       )}
@@ -580,22 +597,44 @@ const BucketShare = () => {
           )}
 
           {showPreView && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-              <div className="relative bg-opacity-50 bg-white rounded-lg p-1 w-full h-full max-w-none flex flex-col">
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md"
+              style={{
+                paddingTop: 'env(safe-area-inset-top, 0px)',
+                paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                paddingLeft: 'env(safe-area-inset-left, 0px)',
+                paddingRight: 'env(safe-area-inset-right, 0px)',
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) handleCloseModal();
+              }}
+            >
+              <div className="relative bg-transparent rounded-lg w-full h-full max-w-none flex flex-col">
                 <button
-                  className="absolute top-4 right-4 text-white text-2xl font-bold bg-black bg-opacity-50 rounded-full w-10 h-10 flex items-center justify-center z-50"
+                  type="button"
+                  className="absolute z-[60] flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-black/75 hover:bg-black/95 active:scale-95 text-white shadow-xl border border-white/20 backdrop-blur-md cursor-pointer transition-all duration-150"
+                  style={{
+                    top: 'max(16px, calc(env(safe-area-inset-top, 0px) + 12px))',
+                    right: 'max(16px, calc(env(safe-area-inset-right, 0px) + 12px))',
+                  }}
                   onClick={handleCloseModal}
                   aria-label="Close">
-                  ✕
+                  <span className="text-2xl leading-none select-none font-bold">✕</span>
                 </button>
 
-                <div className="flex items-center justify-center relative flex-grow">
+                <div className="flex items-center justify-center relative flex-grow p-4 sm:p-6">
                   {currentIndex > 0 && (
                     <button
-                      className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white text-2xl font-bold bg-black bg-opacity-50 rounded-full w-12 h-12 flex items-center justify-center z-50"
+                      type="button"
+                      className="absolute z-[60] flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-black/75 hover:bg-black/95 active:scale-95 text-white shadow-xl border border-white/20 backdrop-blur-md cursor-pointer transition-all duration-150"
+                      style={{
+                        left: 'max(12px, calc(env(safe-area-inset-left, 0px) + 12px))',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                      }}
                       onClick={handlePreviousImage}
                       aria-label="Previous">
-                      ◀
+                      <span className="text-xl leading-none select-none">◀</span>
                     </button>
                   )}
 
@@ -656,10 +695,16 @@ const BucketShare = () => {
 
                   {currentIndex < bucket?.length - 1 && (
                     <button
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white text-2xl font-bold bg-black bg-opacity-50 rounded-full w-12 h-12 flex items-center justify-center z-50"
+                      type="button"
+                      className="absolute z-[60] flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-black/75 hover:bg-black/95 active:scale-95 text-white shadow-xl border border-white/20 backdrop-blur-md cursor-pointer transition-all duration-150"
+                      style={{
+                        right: 'max(12px, calc(env(safe-area-inset-right, 0px) + 12px))',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                      }}
                       onClick={handleNextImage}
                       aria-label="Next">
-                      ▶
+                      <span className="text-xl leading-none select-none">▶</span>
                     </button>
                   )}
                 </div>
