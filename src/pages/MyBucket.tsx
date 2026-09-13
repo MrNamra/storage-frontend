@@ -175,6 +175,7 @@ export default function MyBucket() {
   const preView = (index) => {
     setShowPreView(true);
     setFileID(index);
+    setLoading(true);
   };
 
   const [currentIndex, setCurrentIndex] = useState(fileId || 0); // Track the current file index
@@ -676,22 +677,32 @@ export default function MyBucket() {
                   const isVideo = mimeType.startsWith('video/') || fileType === 'video' || /\.(mov|mp4|m4v|mkv|webm|avi|3gp|flv|wmv)$/i.test(fileNameLower);
                   if (isVideo) {
                     return (
-                      <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-full h-full flex flex-col items-center justify-center relative">
+                        {loading && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-20 rounded-md pointer-events-none">
+                            <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-3" />
+                            <p className="text-white text-sm font-medium animate-pulse">Loading / Optimizing video...</p>
+                          </div>
+                        )}
                         <video
                           key={streamUrl}
                           controls
                           autoPlay
                           playsInline
+                          preload="auto"
                           className="max-w-full max-h-[85vh] rounded-md shadow-lg"
+                          onLoadStart={() => setLoading(true)}
+                          onLoadedMetadata={() => setLoading(false)}
                           onLoadedData={() => setLoading(false)}
                           onCanPlay={() => setLoading(false)}
+                          onWaiting={() => setLoading(true)}
+                          onPlaying={() => setLoading(false)}
                           onError={(e) => {
                             setLoading(false);
                             console.error('Video load error:', e);
                             toast.error('Failed to load video.');
                           }}>
                           <source src={streamUrl} type="video/mp4" />
-                          <source src={streamUrl} type={mimeType || 'video/mp4'} />
                           <source src={streamUrl} />
                           Your browser does not support the video tag.
                         </video>

@@ -1,10 +1,10 @@
 import axios, {Method, AxiosProgressEvent} from 'axios';
 
 // Development server
-// export const base_url = "https://api.raju.serv00.net/api/";
-// export const front_url = "https://raju.serv00.net"
-export const base_url = "http://127.0.0.1:8000/api/";
-export const front_url = "http://localhost:5173";
+export const base_url = "https://cwscloud.myftp.org/api/";
+export const front_url = "https://cwscloud.myftp.org"
+// export const base_url = "http://127.0.0.1:8000/api/";
+// export const front_url = "http://localhost:5173";
 
 interface ApiResponse<T = any> {
   data: T;
