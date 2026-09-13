@@ -21,6 +21,7 @@ import moment from 'moment';
 import {MoreVertical, Trash2} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {Progress} from '@/components/ui/progress';
+import {bulkDownloadFiles, BulkProgress, parseFilenameFromHeaders} from '@/lib/bulkDownload';
 
 import {
   DropdownMenu,
@@ -48,6 +49,15 @@ export default function MyBucket() {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [checkedFiles, setCheckedFiles] = useState([]);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<BulkProgress>({
+    current: 0,
+    total: 0,
+    percent: 0,
+    currentFileName: '',
+    stage: 'downloading',
+  });
+  const [bulkAbortController, setBulkAbortController] = useState<AbortController | null>(null);
 
   const [totlaFile, setTotalFile] = useState(0);
   const [totlaStorage, setStorage] = useState(0);
@@ -219,6 +229,75 @@ export default function MyBucket() {
         ? prev.filter((id) => id !== fileId)
         : [...prev, fileId]
     );
+  };
+
+  const toggleSelectAll = () => {
+    if (!bucket || bucket.length === 0) return;
+    if (checkedFiles.length === bucket.length) {
+      setCheckedFiles([]);
+    } else {
+      setCheckedFiles(bucket.map((f: any) => f.msg_id));
+    }
+  };
+
+  const handleBulkDownload = async (filesToDownload?: any[]) => {
+    const targetFiles = filesToDownload || bucket.filter((f: any) => checkedFiles.includes(f.msg_id));
+    if (!targetFiles || targetFiles.length === 0) {
+      toast.error('No files selected to download');
+      return;
+    }
+
+    const controller = new AbortController();
+    setBulkAbortController(controller);
+    setBulkDownloading(true);
+
+    try {
+      await bulkDownloadFiles({
+        files: targetFiles,
+        fetchFileBlob: async (file: any, signal?: AbortSignal) => {
+          const res: any = await fetchDataFromAPI(
+            'bucket/file/download',
+            'post',
+            {
+              file_id: file.msg_id,
+              bucket_id: params?.id,
+            },
+            user,
+            undefined,
+            'blob'
+          );
+          const filename = parseFilenameFromHeaders(res.headers, file.file_name || `file_${file.msg_id}`);
+          return { blob: res.data, filename };
+        },
+        zipFilename: `cloudvault-${bucketName || 'bucket'}-files.zip`,
+        onProgress: (p) => setBulkProgress(p),
+        signal: controller.signal,
+      });
+
+      toast.success(
+        targetFiles.length === 1
+          ? 'File downloaded successfully!'
+          : `Successfully downloaded ${targetFiles.length} files!`
+      );
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        toast('Download canceled');
+      } else {
+        console.error('Bulk download error:', err);
+        toast.error('Failed to download files');
+      }
+    } finally {
+      setBulkDownloading(false);
+      setBulkAbortController(null);
+    }
+  };
+
+  const handleCancelBulkDownload = () => {
+    if (bulkAbortController) {
+      bulkAbortController.abort();
+    }
+    setBulkDownloading(false);
+    setBulkAbortController(null);
   };
   const handleBulkDelete = () => {
     fetchDataFromAPI(`bucket/${params?.id}/delete-file`, 'post', { file_id: checkedFiles }, user)
@@ -518,29 +597,65 @@ export default function MyBucket() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>
-                    <Button
-                      variant="destructive"
-                      disabled={checkedFiles.length == 0}
-                      onClick={() => setShowConfirm(true)}
-                    >
-                      Delete ({checkedFiles.length})
-                    </Button>
+                  <TableHead className="w-[60px]">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={bucket?.length > 0 && checkedFiles.length === bucket?.length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
+                        title={checkedFiles.length === bucket?.length ? "Deselect All" : "Select All"}
+                      />
+                    </div>
                   </TableHead>
-                  <TableHead className="w-[400px]">
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort('name')}
-                      className="flex items-center space-x-2">
-                      <span>File</span>
-                    </Button>
+                  <TableHead className="min-w-[340px]">
+                    <div className="flex items-center space-x-2">
+                      {checkedFiles.length > 0 ? (
+                        <>
+                          <Button
+                            size="sm"
+                            className="bg-purple-600 hover:bg-purple-700 text-white flex items-center space-x-1.5 h-8 px-3 text-xs"
+                            onClick={() => handleBulkDownload()}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            <span>Download ({checkedFiles.length})</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => setShowConfirm(true)}
+                            className="h-8 px-3 text-xs flex items-center space-x-1"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Delete ({checkedFiles.length})</span>
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="flex items-center space-x-3">
+                          <Button
+                            variant="ghost"
+                            onClick={() => handleSort('name')}
+                            className="flex items-center space-x-2 h-8 px-2">
+                            <span>File</span>
+                          </Button>
+                          {bucket?.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleBulkDownload(bucket)}
+                              className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 h-8 px-2.5 text-xs flex items-center space-x-1.5"
+                              title="Download all files in this bucket"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              <span>Download All ({bucket.length})</span>
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </TableHead>
                   <TableHead>File Name</TableHead>
-
                   <TableHead>Date</TableHead>
-                  {/* 
-                <TableHead className="w-[70px]"></TableHead>
-                */}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -835,6 +950,53 @@ export default function MyBucket() {
                 }}
               >
                 Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkDownloading && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-3 bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 rounded-xl">
+                <Download className="h-6 w-6 animate-bounce" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {bulkProgress.stage === 'zipping'
+                    ? 'Creating ZIP Archive...'
+                    : bulkProgress.stage === 'saving'
+                    ? 'Saving Download...'
+                    : `Downloading Files (${bulkProgress.current}/${bulkProgress.total})`}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {bulkProgress.currentFileName}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 my-4">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-purple-600 h-full rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${bulkProgress.percent}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>{bulkProgress.stage === 'zipping' ? 'Compressing files...' : `${bulkProgress.current} of ${bulkProgress.total} completed`}</span>
+                <span className="font-semibold text-purple-600 dark:text-purple-400">{bulkProgress.percent}%</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-5">
+              <Button
+                variant="outline"
+                onClick={handleCancelBulkDownload}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                Cancel
               </Button>
             </div>
           </div>

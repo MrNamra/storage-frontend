@@ -1,10 +1,15 @@
 import axios, {Method, AxiosProgressEvent} from 'axios';
 
-// Development server
-export const base_url = "https://cwscloud.myftp.org/api/";
-export const front_url = "https://cwscloud.myftp.org"
-// export const base_url = "http://127.0.0.1:8000/api/";
-// export const front_url = "http://localhost:5173";
+// Dynamic API and frontend URL (works automatically in production domain, local dev, or IP)
+export const base_url =
+  typeof window !== 'undefined'
+    ? `${window.location.origin}/api/`
+    : 'https://cwscloud.myftp.org/api/';
+
+export const front_url =
+  typeof window !== 'undefined'
+    ? window.location.origin
+    : 'https://cwscloud.myftp.org';
 
 interface ApiResponse<T = any> {
   data: T;
