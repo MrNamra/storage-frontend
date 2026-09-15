@@ -20,8 +20,8 @@ import {useParams} from 'react-router-dom';
 import moment from 'moment';
 import {MoreVertical, Trash2} from 'lucide-react';
 import {motion} from 'framer-motion';
-import {Progress} from '@/components/ui/progress';
 import {bulkDownloadFiles, BulkProgress, parseFilenameFromHeaders} from '@/lib/bulkDownload';
+import NotFound from './NotFound';
 
 import {
   DropdownMenu,
@@ -42,6 +42,7 @@ export default function MyBucket() {
   const [loading, setLoading] = useState(false); // State for loading
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [notFound, setNotFound] = useState(false);
   const [password, setPassword] = useState('');
 
   const [fileId, setFileID] = useState();
@@ -79,6 +80,7 @@ export default function MyBucket() {
 
   useEffect(() => {
     setCurrentPage(1);
+    setNotFound(false);
   }, [params?.id]);
 
   useEffect(() => {
@@ -116,6 +118,10 @@ export default function MyBucket() {
       })
       .catch((error) => {
         console.log('error', error);
+        const status = error?.response?.status || error?.status;
+        if (status === 404 || error?.message?.includes('404')) {
+          setNotFound(true);
+        }
         setLoading(false);
       });
   };
@@ -531,6 +537,18 @@ export default function MyBucket() {
   //   // Otherwise, show it in MB
   //   return `${sizeInMB?.toFixed(2)} MB`;
   // };
+
+  if (notFound) {
+    return (
+      <DashboardLayout>
+        <NotFound
+          title="Bucket Not Found"
+          message="The bucket you are looking for does not exist, has been deleted, or you do not have permission to access it."
+          statusCode="404"
+        />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <>

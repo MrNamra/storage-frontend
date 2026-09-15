@@ -6,6 +6,7 @@ import Terms from './pages/Terms';
 import Dashboard from './pages/Dashboard';
 import BucketShare from './pages/BucketShare';
 import MyBucket from './pages/MyBucket';
+import NotFound from './pages/NotFound';
 
 const App = () => {
   return (
@@ -15,9 +16,11 @@ const App = () => {
       <Route path="/signup" element={<Signup />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/bucket/:id" element={<BucketShare />} />
+      <Route path="/shared-bucket/:id" element={<BucketShare />} />
       <Route path="/mybucket/:id" element={<MyBucket />} />
-
       <Route path="/terms-conditions" element={<Terms />} />
+      <Route path="/404" element={<NotFound />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };

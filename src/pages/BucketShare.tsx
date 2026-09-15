@@ -27,6 +27,8 @@ import moment from 'moment';
 import PDFViewer from 'pdf-viewer-reactjs';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import toast, {Toaster} from 'react-hot-toast';
+import JSZip from 'jszip';
+import NotFound from './NotFound';
 import {bulkDownloadFiles, BulkProgress, parseFilenameFromHeaders} from '@/lib/bulkDownload';
 
 const BucketShare = () => {
@@ -53,6 +55,7 @@ const BucketShare = () => {
   const [status, setStatus] = useState(false);
 
   const [checkStatus, setCheckStatus] = useState(false);
+  const [is404, setIs404] = useState(false);
   const [checkedFiles, setCheckedFiles] = useState<any[]>([]);
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<BulkProgress>({
@@ -197,8 +200,10 @@ const BucketShare = () => {
       })
       .catch((error) => {
         console.log('error', error);
-        if (error?.status === 500) {
+        const errStatus = error?.response?.status || error?.status;
+        if (errStatus === 404 || errStatus === 500 || !errStatus) {
           setCheckStatus(true);
+          setIs404(errStatus === 404 || !errStatus);
         }
       });
   };
@@ -909,13 +914,15 @@ const BucketShare = () => {
           )}
         </div>
       ) : (
-        <div className="flex flex-col justify-center items-center h-screen bg-purple-600 text-white text-center p-6">
-          <div className="text-9xl font-extrabold">404</div>
-          <div className="text-xl mt-6">
-            The page you're looking for could not be found.
-          </div>
-          <div className="text-lg mt-4">Please try again or check the URL.</div>
-        </div>
+        <NotFound
+          title={is404 ? 'Shared Bucket Not Found' : 'Bucket Unavailable'}
+          message={
+            is404
+              ? 'The shared bucket link you followed does not exist, has expired, or was removed by the owner.'
+              : 'Unable to load this shared bucket right now. Please check the URL or try again later.'
+          }
+          statusCode={is404 ? '404' : '500'}
+        />
       )}
       {bulkDownloading && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">

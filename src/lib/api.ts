@@ -58,6 +58,9 @@ export const fetchDataFromAPI = <T>(
         }
       })
       .catch((error) => {
+        if (error && error.response) {
+          error.status = error.response.status;
+        }
         reject(error);
       });
   });
