@@ -33,7 +33,6 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
 import toast, { Toaster } from "react-hot-toast";
 import { front_url } from "../../lib/api"
-import { base_url } from "../../lib/api"
 export function BucketList() {
   const user = JSON.parse(getUser());
 
@@ -84,7 +83,6 @@ export function BucketList() {
   const renderTableBody = () => {
     fetchDataFromAPI("user/dashboard", "get", "", user)
       .then((res) => {
-        console.log("res", res);
         setBuckets(res?.data?.bucket);
       })
       .catch((error) => {
@@ -100,7 +98,6 @@ export function BucketList() {
   const handleDelete = (id) => {
     fetchDataFromAPI(`bucket/delete/${id}`, "post", "", user)
       .then((res) => {
-        console.log("res", res);
         renderTableBody();
       })
       .catch((error) => {

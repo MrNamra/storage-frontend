@@ -46,7 +46,6 @@ const BucketShare = () => {
   const [showPreView, setShowPreView] = useState(false);
 
   const [totlaFile, setTotalFile] = useState(0);
-  const [totlaStorage, setStorage] = useState(0);
 
   const [btnDisable, setDisable] = useState(false);
   const [fileId, setFileID] = useState();
@@ -175,7 +174,7 @@ const BucketShare = () => {
     }
   }, [params?.id, currentPage]);
 
-  const handleCall = (page) => {
+  const handleCall = (page = currentPage) => {
     fetchDataFromAPI(
       `show/${params?.id}?page=${page}&limit=15`,
       'get',
@@ -183,12 +182,18 @@ const BucketShare = () => {
       '',
     )
       .then((res) => {
-        // console.log('res', res);
-        setBucket(res?.data);
-        setTotalFile(res?.data?.length);
-        setStorage(res?.totalStorage);
-        setTotalPages(res?.pagination?.totalPages);
-        // Set the fetched data to the state
+        const files = Array.isArray(res?.data) ? res.data : (res?.data?.files || []);
+        const pagination = res?.pagination || res?.data?.pagination;
+        const total = pagination?.totalFiles ?? files.length;
+        const pages = pagination?.totalPages ?? Math.max(1, Math.ceil(total / 15));
+
+        setBucket(files);
+        setTotalFile(total);
+        setStorage(res?.totalStorage ?? res?.data?.totalStorage ?? 0);
+        setTotalPages(pages);
+        if (currentPage > pages && pages >= 1) {
+          setCurrentPage(pages);
+        }
       })
       .catch((error) => {
         console.log('error', error);
@@ -273,28 +278,86 @@ const BucketShare = () => {
   };
 
   // Handle page change
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= (totalPages || 1)) {
       setCurrentPage(page);
     }
   };
 
   const renderPagination = () => {
+    if (!totalPages || totalPages <= 1) {
+      return (
+        <button
+          key={1}
+          className="px-3.5 py-1.5 border rounded-lg mx-0.5 text-sm bg-purple-600 text-white border-purple-600 shadow-sm font-semibold">
+          1
+        </button>
+      );
+    }
     const pages = [];
-    for (let i = 1; i <= totalPages; i++) {
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+
+    if (endPage - startPage < maxVisible - 1) {
+      startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+
+    if (startPage > 1) {
+      pages.push(
+        <button
+          key={1}
+          onClick={() => handlePageChange(1)}
+          className={`px-3.5 py-1.5 border rounded-lg mx-0.5 text-sm transition-colors ${
+            currentPage === 1
+              ? 'bg-purple-600 text-white border-purple-600 shadow-sm font-semibold'
+              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700'
+          }`}>
+          1
+        </button>
+      );
+      if (startPage > 2) {
+        pages.push(
+          <span key="dots-start" className="px-1 text-gray-400">...</span>
+        );
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
       pages.push(
         <button
           key={i}
           onClick={() => handlePageChange(i)}
-          className={`px-4 py-2 border rounded-md mx-1 ${
+          className={`px-3.5 py-1.5 border rounded-lg mx-0.5 text-sm transition-colors ${
             currentPage === i
-              ? 'bg-purple-600 text-white'
-              : 'bg-white text-blue-500 hover:bg-blue-100'
+              ? 'bg-purple-600 text-white border-purple-600 shadow-sm font-semibold'
+              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700'
           }`}>
           {i}
         </button>,
       );
     }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pages.push(
+          <span key="dots-end" className="px-1 text-gray-400">...</span>
+        );
+      }
+      pages.push(
+        <button
+          key={totalPages}
+          onClick={() => handlePageChange(totalPages)}
+          className={`px-3.5 py-1.5 border rounded-lg mx-0.5 text-sm transition-colors ${
+            currentPage === totalPages
+              ? 'bg-purple-600 text-white border-purple-600 shadow-sm font-semibold'
+              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700'
+          }`}>
+          {totalPages}
+        </button>
+      );
+    }
+
     return pages;
   };
 
@@ -665,20 +728,22 @@ const BucketShare = () => {
             </Table>
 
             {/* Pagination */}
-            <div className="flex justify-center items-center space-x-4 mt-4 mb-3">
+            <div className="flex justify-center items-center flex-wrap gap-2 mt-4 mb-3">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-4 py-2 border rounded-md bg-white text-purple-500 hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed">
+                disabled={currentPage <= 1}
+                className="px-3.5 py-1.5 border rounded-lg text-sm bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm font-medium">
                 Previous
               </button>
 
-              {renderPagination()}
+              <div className="flex items-center">
+                {renderPagination()}
+              </div>
 
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 border rounded-md bg-white text-purple-500 hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed">
+                disabled={currentPage >= (totalPages || 1)}
+                className="px-3.5 py-1.5 border rounded-lg text-sm bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm font-medium">
                 Next
               </button>
             </div>

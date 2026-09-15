@@ -12,11 +12,9 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [searchQuery, setSearchQuery] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [showModal, setShowModal] = useState(false); // State for modal visibility
   const [loading, setLoading] = useState(false);
-  const [userID, setUserId] = useState('');
   const navigate = useNavigate();
   const user = JSON.parse(getUser());
 
@@ -38,7 +36,6 @@ export default function DashboardLayout({
   useEffect(() => {
     fetchDataFromAPI('user/profile', 'get', '', user)
       .then((res) => {
-        console.log('res', res);
         setUserId(res.data?.id);
         formik.setFieldValue('name', res?.data?.name);
         formik.setFieldValue('email', res?.data?.email);
