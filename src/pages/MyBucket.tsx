@@ -22,6 +22,7 @@ import {MoreVertical, Trash2} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {bulkDownloadFiles, BulkProgress, parseFilenameFromHeaders} from '@/lib/bulkDownload';
 import {uploadFileChunked} from '@/lib/chunkedUpload';
+import {Progress} from '@/components/ui/progress';
 import NotFound from './NotFound';
 
 import {
