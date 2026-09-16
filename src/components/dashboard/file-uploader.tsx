@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import {Alert, AlertDescription} from '@/components/ui/alert';
 import {fetchDataFromAPI} from '@/lib/api';
+import {uploadFileChunked} from '@/lib/chunkedUpload';
 import constants, {getUser} from '@/lib/constants';
 import {useNavigate, useParams} from 'react-router-dom';
 import toast, { Toaster } from "react-hot-toast";
@@ -20,6 +21,8 @@ export function FileUploader() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatusText, setUploadStatusText] = useState('');
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [selectedBucket, setSelectedBucket] = useState<string>('');
   const [showError, setShowError] = useState(false);
   const [bucket, setBucket] = useState([]);
@@ -81,45 +84,44 @@ export function FileUploader() {
     }
 
     setUploading(true);
-
-    const formData = new FormData();
-    formData.append("bucket_id", selectedBucket);
-
-    files.forEach((file) => {
-      formData.append("files[]", file);
-    });
+    setUploadProgress(0);
 
     const toastId = toast.loading("Uploading files... 0%");
+    const totalToUpload = files.length;
+    let successCount = 0;
 
     try {
-      const res = await fetchDataFromAPI(
-        "bucket/file/upload",
-        "post",
-        formData,
-        user,
-        // 👇 REAL PROGRESS HANDLER
-        (progressEvent) => {
-          if (!progressEvent.total) return;
+      for (let i = 0; i < totalToUpload; i++) {
+        const file = files[i];
+        setCurrentFileIndex(i + 1);
 
-          const percent = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
+        await uploadFileChunked({
+          file,
+          bucketId: selectedBucket,
+          token: user,
+          onProgress: (p) => {
+            setUploadProgress(p.percent);
+            setUploadStatusText(p.message);
+            toast.loading(`[${i + 1}/${totalToUpload}] ${file.name} (${p.percent}%)`, {
+              id: toastId,
+            });
+          },
+        });
 
-          setUploadProgress(percent);
+        successCount++;
+      }
 
-          toast.loading(`Uploading files... ${percent}%`, {
-            id: toastId,
-          });
-        }
+      toast.success(
+        successCount === 1 ? "Upload completed" : `${successCount} files uploaded successfully`,
+        { id: toastId }
       );
-
-      toast.success(res?.message || "Upload completed", { id: toastId });
 
       setFiles([]);
       setSelectedBucket("");
       setUploadProgress(0);
-    } catch (error) {
-      toast.error("Upload failed", { id: toastId });
+      setUploadStatusText("");
+    } catch (error: any) {
+      toast.error(error?.message || "Upload failed", { id: toastId });
       console.error(error);
     } finally {
       setUploading(false);
@@ -195,11 +197,14 @@ export function FileUploader() {
           </div>
 
           {uploading ? (
-            <div className="mt-4">
-              <Progress value={uploadProgress} className="h-2" />
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                Uploading... {uploadProgress}%
-              </p>
+            <div className="mt-4 p-3 rounded-lg bg-purple-50 dark:bg-gray-700/60 border border-purple-200 dark:border-gray-600 space-y-1.5">
+              <div className="flex justify-between text-xs font-semibold text-purple-700 dark:text-purple-300">
+                <span className="truncate max-w-[220px]">
+                  {uploadStatusText || `Uploading file ${currentFileIndex} of ${files.length}...`}
+                </span>
+                <span className="tabular-nums font-mono">{uploadProgress}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-2 bg-purple-100 dark:bg-gray-600" />
             </div>
           ) : (
             <button

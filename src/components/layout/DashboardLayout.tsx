@@ -15,6 +15,7 @@ export default function DashboardLayout({
   const [showMenu, setShowMenu] = useState(false);
   const [showModal, setShowModal] = useState(false); // State for modal visibility
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | number>('');
   const navigate = useNavigate();
   const user = JSON.parse(getUser());
 

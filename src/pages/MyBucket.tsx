@@ -21,6 +21,7 @@ import moment from 'moment';
 import {MoreVertical, Trash2} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {bulkDownloadFiles, BulkProgress, parseFilenameFromHeaders} from '@/lib/bulkDownload';
+import {uploadFileChunked} from '@/lib/chunkedUpload';
 import NotFound from './NotFound';
 
 import {
@@ -65,6 +66,11 @@ export default function MyBucket() {
   const [showUploader, setShowUploader] = useState(false);
 
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatusText, setUploadStatusText] = useState('');
+  const [uploadCurrentFile, setUploadCurrentFile] = useState('');
+  const [uploadCurrentFileIndex, setUploadCurrentFileIndex] = useState(0);
+  const [uploadAbortController, setUploadAbortController] = useState<AbortController | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -142,44 +148,70 @@ export default function MyBucket() {
     setShowUploader(false);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const formData = new FormData();
-    formData.append('bucket_id', params?.id);
-
-    // Append all selected files to the FormData
-    for (let i = 0; i < selectedFiles?.length; i++) {
-      formData.append('files[]', selectedFiles[i]);
+  const handleCancelUpload = () => {
+    if (uploadAbortController) {
+      uploadAbortController.abort();
+      setUploadAbortController(null);
+      setIsUploading(false);
+      setUploadStatusText('Upload cancelled');
+      toast('Upload cancelled');
     }
+  };
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    if (!selectedFiles?.length) return;
+
+    const controller = new AbortController();
+    setUploadAbortController(controller);
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    const totalToUpload = selectedFiles.length;
+    let successCount = 0;
 
     try {
-      setLoading(true);
+      for (let i = 0; i < totalToUpload; i++) {
+        if (controller.signal.aborted) break;
 
-      // Upload files using the API
-      const res = await fetchDataFromAPI(
-        `bucket/file/upload`,
-        'post',
-        formData,
-        user,
-      );
+        const file = selectedFiles[i];
+        setUploadCurrentFile(file.name);
+        setUploadCurrentFileIndex(i + 1);
 
-      // Simulate upload progress
-      for (let i = 0; i <= 100; i += 10) {
-        setUploadProgress(i);
-        await new Promise((resolve) => setTimeout(resolve, 200)); // Simulate delay
+        await uploadFileChunked({
+          file,
+          bucketId: params?.id,
+          token: user,
+          signal: controller.signal,
+          onProgress: (p) => {
+            setUploadProgress(p.percent);
+            setUploadStatusText(p.message);
+          },
+        });
+
+        successCount++;
       }
-      toast.success(res?.message);
-      setSelectedFiles([]);
 
-      // After upload completion
-      mybucket();
-      setShowUploader(false);
-    } catch (error) {
-      console.error('Error during upload:', error);
+      if (successCount > 0) {
+        toast.success(
+          successCount === 1
+            ? 'File uploaded successfully!'
+            : `${successCount} files uploaded successfully!`
+        );
+        setSelectedFiles([]);
+        mybucket(1);
+      }
+    } catch (error: any) {
+      if (!controller.signal.aborted) {
+        console.error('Upload error:', error);
+        toast.error(error?.message || 'Upload failed');
+      }
     } finally {
-      // Always reset loading state
-      setLoading(false);
+      setIsUploading(false);
+      setUploadAbortController(null);
+      setUploadCurrentFile('');
+      setUploadProgress(0);
+      setUploadStatusText('');
     }
   };
 
@@ -654,28 +686,46 @@ export default function MyBucket() {
               </div>
             )}
             
-            {loading && (
-              <div className="mt-4">
-              <Progress value={uploadProgress} className="h-2" />
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-              Uploading... {uploadProgress}%
-              </p>
+            {isUploading && (
+              <div className="mt-4 p-4 rounded-xl bg-purple-50 dark:bg-gray-700/70 border border-purple-200 dark:border-gray-600 space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-purple-700 dark:text-purple-300">
+                  <span className="truncate max-w-[220px]" title={uploadCurrentFile}>
+                    File {uploadCurrentFileIndex} of {selectedFiles.length}: {uploadCurrentFile}
+                  </span>
+                  <span className="tabular-nums font-mono font-bold">{uploadProgress}%</span>
+                </div>
+                <Progress value={uploadProgress} className="h-2.5 bg-purple-100 dark:bg-gray-600" />
+                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300">
+                  <span className="truncate pr-2">{uploadStatusText || 'Uploading...'}</span>
+                  <button
+                    type="button"
+                    onClick={handleCancelUpload}
+                    className="text-red-500 hover:text-red-700 font-semibold shrink-0 ml-2 hover:underline">
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
- 
 
             {/* Upload Button */}
             <button
-              disabled={selectedFiles?.length === 0}
+              disabled={selectedFiles?.length === 0 || isUploading}
               className={`w-full ${
-                selectedFiles?.length === 0 ? 'bg-purple-300' : 'bg-purple-600'
-              }  text-white font-medium py-3 rounded-lg flex items-center justify-center space-x-2 transition duration-200`}
+                selectedFiles?.length === 0 || isUploading
+                  ? 'bg-purple-300 dark:bg-purple-900/40 cursor-not-allowed text-white/80'
+                  : 'bg-purple-600 hover:bg-purple-700 text-white shadow-md'
+              } font-medium py-3 rounded-lg flex items-center justify-center space-x-2 transition duration-200`}
               onClick={(e) => handleSubmit(e)}>
-              <Upload className="h-6 w-6" />
-              {loading ? (
-                <span className="loader  h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
+              {isUploading ? (
+                <>
+                  <span className="loader h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
+                  <span>Uploading ({uploadProgress}%)...</span>
+                </>
               ) : (
-                <span>Upload Files</span>
+                <>
+                  <Upload className="h-5 w-5" />
+                  <span>Upload {selectedFiles.length > 0 ? `(${selectedFiles.length}) File${selectedFiles.length > 1 ? 's' : ''}` : 'Files'}</span>
+                </>
               )}
             </button>
           </motion.div>

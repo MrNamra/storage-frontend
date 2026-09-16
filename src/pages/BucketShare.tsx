@@ -30,6 +30,7 @@ import toast, {Toaster} from 'react-hot-toast';
 import JSZip from 'jszip';
 import NotFound from './NotFound';
 import {bulkDownloadFiles, BulkProgress, parseFilenameFromHeaders} from '@/lib/bulkDownload';
+import {uploadFileChunked} from '@/lib/chunkedUpload';
 
 const BucketShare = () => {
   const params = useParams();
@@ -53,6 +54,12 @@ const BucketShare = () => {
   const [fileId, setFileID] = useState();
 
   const [status, setStatus] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatusText, setUploadStatusText] = useState('');
+  const [uploadCurrentFile, setUploadCurrentFile] = useState('');
+  const [uploadCurrentFileIndex, setUploadCurrentFileIndex] = useState(0);
+  const [uploadAbortController, setUploadAbortController] = useState<AbortController | null>(null);
 
   const [checkStatus, setCheckStatus] = useState(false);
   const [is404, setIs404] = useState(false);
@@ -241,45 +248,84 @@ const BucketShare = () => {
   //   return aValue < bValue ? -1 * modifier : aValue > bValue ? 1 * modifier : 0;
   // });
 
-  const handleSubmit = (e) => {
+  const handleCancelUpload = () => {
+    if (uploadAbortController) {
+      uploadAbortController.abort();
+      setUploadAbortController(null);
+      setIsUploading(false);
+      setUploadStatusText('Upload cancelled');
+      toast('Upload cancelled');
+    }
+  };
+
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     if (!password.trim()) {
       setError('Password cannot be empty');
       return;
     }
-
-    const formData = new FormData();
-    formData.append('password', password);
-    // formData.append("files", selectedFiles);
-
-    for (let i = 0; i < selectedFiles?.length; i++) {
-      formData.append('files[]', selectedFiles[i]);
+    if (!selectedFiles?.length) {
+      setError('Please select at least one file');
+      return;
     }
 
-    setLoading(true);
-    setStatus(true);
+    const controller = new AbortController();
+    setUploadAbortController(controller);
+    setIsUploading(true);
+    setUploadProgress(0);
     setShowUploader(false);
 
-    fetchDataFromAPI(`files/upload/${params?.id}`, 'post', formData, '')
-      .then((res) => {
-        // console.log('res', res);
-        toast.success(res?.message)
-        handleCall(currentPage);
-        setSelectedFiles([]);
-        setShowUploader(false);
-        setLoading(false);
-        setStatus(false);
-      })
-      .catch((error) => {
-        console.log('error', error);
-        // setError(error?.response?.data?.message);
-        setError(error?.response?.data?.message);
-        toast.error(error?.response?.data?.message)
-        setLoading(false);
-        setShowUploader(false);
-      });
+    const totalToUpload = selectedFiles.length;
+    let successCount = 0;
 
-    // Handle form submission logic here (e.g., API call)
+    try {
+      for (let i = 0; i < totalToUpload; i++) {
+        if (controller.signal.aborted) break;
+
+        const file = selectedFiles[i];
+        setUploadCurrentFile(file.name);
+        setUploadCurrentFileIndex(i + 1);
+
+        await uploadFileChunked({
+          file,
+          code: params?.id,
+          password: password.trim(),
+          signal: controller.signal,
+          onProgress: (p) => {
+            setUploadProgress(p.percent);
+            setUploadStatusText(p.message);
+          },
+        });
+
+        successCount++;
+      }
+
+      if (successCount > 0) {
+        toast.success(
+          successCount === 1
+            ? 'File uploaded successfully!'
+            : `${successCount} files uploaded successfully!`
+        );
+        setSelectedFiles([]);
+        handleCall(1);
+      }
+    } catch (err: any) {
+      if (!controller.signal.aborted) {
+        console.error('Upload error in shared bucket:', err);
+        const errMsg = err?.response?.data?.message || err?.message || 'Upload failed';
+        toast.error(errMsg);
+        if (errMsg.toLowerCase().includes('password')) {
+          setError(errMsg);
+          setShowUploader(true);
+        }
+      }
+    } finally {
+      setIsUploading(false);
+      setUploadAbortController(null);
+      setUploadCurrentFile('');
+      setUploadProgress(0);
+      setUploadStatusText('');
+    }
   };
 
   // Handle page change
@@ -600,23 +646,46 @@ const BucketShare = () => {
                 </div>
               )}
 
+              {isUploading && (
+                <div className="mt-4 p-4 rounded-xl bg-purple-50 dark:bg-gray-700/70 border border-purple-200 dark:border-gray-600 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-semibold text-purple-700 dark:text-purple-300">
+                    <span className="truncate max-w-[220px]" title={uploadCurrentFile}>
+                      File {uploadCurrentFileIndex} of {selectedFiles.length}: {uploadCurrentFile}
+                    </span>
+                    <span className="tabular-nums font-mono font-bold">{uploadProgress}%</span>
+                  </div>
+                  <Progress value={uploadProgress} className="h-2.5 bg-purple-100 dark:bg-gray-600" />
+                  <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300">
+                    <span className="truncate pr-2">{uploadStatusText || 'Uploading...'}</span>
+                    <button
+                      type="button"
+                      onClick={handleCancelUpload}
+                      className="text-red-500 hover:text-red-700 font-semibold shrink-0 ml-2 hover:underline">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Upload Button */}
               <button
-                disabled={selectedFiles?.length === 0}
+                disabled={selectedFiles?.length === 0 || isUploading}
                 className={`w-full ${
-                  selectedFiles?.length === 0
-                    ? 'bg-purple-300'
-                    : 'bg-purple-600'
-                }  text-white font-medium py-3 rounded-lg flex items-center justify-center space-x-2 transition duration-200`}
+                  selectedFiles?.length === 0 || isUploading
+                    ? 'bg-purple-300 dark:bg-purple-900/40 cursor-not-allowed text-white/80'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white shadow-md'
+                } font-medium py-3 rounded-lg flex items-center justify-center space-x-2 transition duration-200`}
                 onClick={() => setShowUploader(true)}>
-                {!status && <Upload className="h-6 w-6" />}
-
-                {status ? (
+                {isUploading ? (
                   <>
-                    <span className="loader  h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
+                    <span className="loader h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
+                    <span>Uploading ({uploadProgress}%)...</span>
                   </>
                 ) : (
-                  <span>Upload Files</span>
+                  <>
+                    <Upload className="h-5 w-5" />
+                    <span>Upload {selectedFiles.length > 0 ? `(${selectedFiles.length}) File${selectedFiles.length > 1 ? 's' : ''}` : 'Files'}</span>
+                  </>
                 )}
               </button>
             </motion.div>
