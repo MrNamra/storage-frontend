@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {Cloud, Lock, Search, User} from 'lucide-react';
+import {Cloud, Lock, Search, User, Shield} from 'lucide-react';
 import {Input} from '@/components/ui/input';
 import {Link, useNavigate} from 'react-router-dom';
 import constants, {getUser} from '@/lib/constants';
@@ -16,6 +16,7 @@ export default function DashboardLayout({
   const [showModal, setShowModal] = useState(false); // State for modal visibility
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | number>('');
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
   const navigate = useNavigate();
   const user = JSON.parse(getUser());
 
@@ -38,6 +39,7 @@ export default function DashboardLayout({
     fetchDataFromAPI('user/profile', 'get', '', user)
       .then((res) => {
         setUserId(res.data?.id);
+        setCurrentUserRole(res.data?.role || '');
         formik.setFieldValue('name', res?.data?.name);
         formik.setFieldValue('email', res?.data?.email);
       })
@@ -138,22 +140,38 @@ export default function DashboardLayout({
             </div> */}
 
             {/* User Actions */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
+              {currentUserRole === 'admin' && (
+                <Link
+                  to="/admin"
+                  className="flex items-center gap-1.5 text-xs bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-300 px-3 py-1.5 rounded-lg font-semibold transition-colors shadow-sm">
+                  <Shield className="w-3.5 h-3.5 text-purple-700" />
+                  <span className="hidden sm:inline">Admin Panel</span>
+                </Link>
+              )}
+
               <div className="relative">
                 {/* Profile Button */}
-            
-                    <button
-                    className="flex items-center space-x-3 focus:outline-none"
-                    onClick={toggleMenu}>
-                    <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                      <User className="h-5 w-5 text-purple-600" />
-                    </div>
-                  </button>
-                
+                <button
+                  className="flex items-center space-x-3 focus:outline-none"
+                  onClick={toggleMenu}>
+                  <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                    <User className="h-5 w-5 text-purple-600" />
+                  </div>
+                </button>
 
                 {/* Dropdown Menu */}
                 {showMenu && (
                   <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
+                    {currentUserRole === 'admin' && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setShowMenu(false)}
+                        className="w-full px-4 py-2 text-left text-sm text-purple-700 hover:bg-purple-50 focus:outline-none flex items-center gap-2 font-semibold border-b border-gray-100">
+                        <Shield className="w-4 h-4 text-purple-600" />
+                        <span>🛡️ Admin Panel</span>
+                      </Link>
+                    )}
                     <button
                       onClick={handleEditProfile}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 focus:outline-none">
