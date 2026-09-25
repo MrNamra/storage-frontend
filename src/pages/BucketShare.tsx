@@ -464,80 +464,62 @@ const BucketShare = () => {
     setMediaLoading(true);
   };
 
-  const handleDownload = async (fileId: string, fileName?: string) => {
-    try {
-      setLoading(true);
-      const response: any = await fetchDataFromAPI(
-        `files/download/${params?.id}`,
-        'post',
-        {
-          file_id: fileId,
-        },
-        '',
-        undefined,
-        'blob'
-      );
+  const handleDownload = (fileId: string, fileName?: string, file?: any) => {
+    // Use the file's signed stream URL with ?dl=1 so the browser downloads directly.
+    const streamUrl = file?.stream_url;
+    if (streamUrl) {
+      const link = document.createElement('a');
+      link.href = `${streamUrl}?dl=1`;
+      link.download = fileName || file?.file_name || 'download';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => { try { document.body.removeChild(link); } catch (_) {} }, 1000);
+      toast.success('Download started');
+      return;
+    }
 
+    // Fallback: legacy blob download
+    setLoading(true);
+    fetchDataFromAPI(
+      `files/download/${params?.id}`,
+      'post',
+      { file_id: fileId },
+      '',
+      undefined,
+      'blob'
+    ).then((response: any) => {
       const blob = response.data;
       const headers = response.headers || {};
       let filename = fileName || 'download';
-
       if (!fileName) {
-        const contentDisposition = headers['content-disposition'] || headers['Content-Disposition'];
-        if (contentDisposition) {
-          const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;\n]*)/i);
-          if (utf8Match && utf8Match[1]) {
-            try {
-              filename = decodeURIComponent(utf8Match[1].trim());
-            } catch (e) {}
-          } else {
-            let filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
-            if (filenameMatch && filenameMatch[1]) {
-              filename = filenameMatch[1].replace(/^['"]|['"]$/g, '').trim();
-              try {
-                filename = decodeURIComponent(filename);
-              } catch (e) {}
-            }
+        const cd = headers['content-disposition'] || headers['Content-Disposition'];
+        if (cd) {
+          const m = cd.match(/filename\*=UTF-8''([^;\n]*)/i);
+          if (m?.[1]) { try { filename = decodeURIComponent(m[1].trim()); } catch (_) {} }
+          else {
+            const m2 = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
+            if (m2?.[1]) { try { filename = decodeURIComponent(m2[1].replace(/^['"]|['"]$/g, '').trim()); } catch (_) {} }
           }
         }
       }
-
       if (filename === 'download' || !filename.includes('.')) {
-        const contentType = headers['content-type'] || headers['Content-Type'] || '';
-        if (contentType.includes('image/jpeg') || contentType.includes('image/jpg')) {
-          filename = filename === 'download' ? 'image.jpg' : `${filename}.jpg`;
-        } else if (contentType.includes('image/png')) {
-          filename = filename === 'download' ? 'image.png' : `${filename}.png`;
-        } else if (contentType.includes('application/pdf')) {
-          filename = filename === 'download' ? 'document.pdf' : `${filename}.pdf`;
-        }
+        const ct = headers['content-type'] || headers['Content-Type'] || '';
+        if (ct.includes('image/jpeg') || ct.includes('image/jpg')) filename = filename === 'download' ? 'image.jpg' : `${filename}.jpg`;
+        else if (ct.includes('image/png')) filename = filename === 'download' ? 'image.png' : `${filename}.png`;
+        else if (ct.includes('application/pdf')) filename = filename === 'download' ? 'document.pdf' : `${filename}.pdf`;
       }
-
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-
-      setTimeout(() => {
-        try {
-          if (link.parentNode) {
-            document.body.removeChild(link);
-          }
-          window.URL.revokeObjectURL(url);
-        } catch (e) {}
-      }, 3000);
-
+      link.href = url; link.download = filename;
+      document.body.appendChild(link); link.click();
+      setTimeout(() => { try { if (link.parentNode) document.body.removeChild(link); window.URL.revokeObjectURL(url); } catch (_) {} }, 3000);
       toast.success('File downloaded successfully');
-    } catch (error: any) {
-      console.error('Download error:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to download file';
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
+    }).catch((error: any) => {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to download file');
+    }).finally(() => setLoading(false));
   };
+
 
   // if (!showPreView) return null;
 
@@ -814,7 +796,7 @@ const BucketShare = () => {
                           variant="ghost"
                           size="icon"
                           className="text-purple-600 hover:text-purple-800 hover:bg-purple-100"
-                          onClick={() => handleDownload(file.msg_id, file.file_name)}
+                          onClick={() => handleDownload(file.msg_id, file.file_name, file)}
                           title="Download File">
                           <Download className="h-5 w-5" />
                         </Button>

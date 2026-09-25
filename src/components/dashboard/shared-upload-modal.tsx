@@ -196,8 +196,20 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
     }
   };
 
+  // On initial mount: try immediately, then retry at 800 ms and 2.5 s.
+  // This handles the race where the SW writes to IndexedDB just before the new page loads.
   useEffect(() => {
     checkQueue();
+    const t1 = setTimeout(() => checkQueue(), 800);
+    const t2 = setTimeout(() => checkQueue(), 2500);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Re-check on every navigation (handles ?shared=1 redirect from SW)
+    checkQueue();
+    const t = setTimeout(() => checkQueue(), 600);
 
     const handleFocus = () => checkQueue();
     const handleCustomTrigger = () => checkQueue();
@@ -209,6 +221,8 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
     const handleSWMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'CLOUDVULT_SHARED_FILES_READY') {
         checkQueue();
+        // SW might fire before IndexedDB write flushes — retry after a short delay
+        setTimeout(() => checkQueue(), 400);
       }
     };
 
@@ -220,6 +234,7 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
     }
 
     return () => {
+      clearTimeout(t);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('cloudvault:check_shared_queue', handleCustomTrigger);
@@ -228,6 +243,7 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
       }
     };
   }, [location.pathname, location.search]);
+
 
   const handleCreateBucket = async (e: React.FormEvent) => {
     e.preventDefault();

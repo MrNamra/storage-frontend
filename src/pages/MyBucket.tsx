@@ -491,93 +491,60 @@ export default function MyBucket() {
   };
 
 
-  const handleDownload = async (fileId: string, fileName?: string, file?: any) => {
-    try {
-      setLoading(true);
-      
-      const response: any = await fetchDataFromAPI(
-        'bucket/file/download',
-        'post',
-        {
-          file_id: fileId,
-          bucket_id: params?.id,
-        },
-        user,
-        undefined,
-        'blob'
-      );
-
-      // Extract blob and headers from response
-      const blob = response.data;
-      const headers = response.headers || {};
-      
-      // Get the filename - prioritize fileName parameter, then Content-Disposition header, then default
-      let filename = fileName || 'download';
-      
-      // Try to extract from Content-Disposition header if fileName not provided
-      if (!fileName) {
-        const contentDisposition = headers['content-disposition'] || headers['Content-Disposition'];
-        if (contentDisposition) {
-          // Try multiple patterns to extract filename
-          // Pattern 1: filename*=UTF-8''...
-          const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;\n]*)/i);
-          if (utf8Match && utf8Match[1]) {
-            try {
-              filename = decodeURIComponent(utf8Match[1].trim());
-            } catch (e) {}
-          } else {
-            // Pattern 2: filename="value" or filename='value'
-            let filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
-            if (filenameMatch && filenameMatch[1]) {
-              filename = filenameMatch[1].replace(/^['"]|['"]$/g, '').trim();
-              try {
-                filename = decodeURIComponent(filename);
-              } catch (e) {}
-            }
-          }
-        }
-      }
-      
-      // Ensure filename has an extension if it's missing
-      if (filename === 'download' || !filename.includes('.')) {
-        const contentType = headers['content-type'] || headers['Content-Type'] || '';
-        if (contentType.includes('image/jpeg') || contentType.includes('image/jpg')) {
-          filename = filename === 'download' ? 'image.jpg' : `${filename}.jpg`;
-        } else if (contentType.includes('image/png')) {
-          filename = filename === 'download' ? 'image.png' : `${filename}.png`;
-        } else if (contentType.includes('application/pdf')) {
-          filename = filename === 'download' ? 'document.pdf' : `${filename}.pdf`;
-        }
-      }
-      
-      // Create a temporary URL for the blob
-      const url = window.URL.createObjectURL(blob);
-      
-      // Create a temporary anchor element and trigger download
+  const handleDownload = (fileId: string, fileName?: string, file?: any) => {
+    // Use the file's signed stream URL directly with ?dl=1 to force attachment disposition.
+    // This avoids loading the entire file into JS memory (which caused the full-page loader).
+    const streamUrl = file?.stream_url;
+    if (streamUrl) {
+      const downloadUrl = `${streamUrl}?dl=1`;
       const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
+      link.href = downloadUrl;
+      link.download = fileName || file?.file_name || 'download';
+      link.rel = 'noopener noreferrer';
       document.body.appendChild(link);
       link.click();
-      
-      // Clean up after 3 seconds to allow browser to read filename
       setTimeout(() => {
-        try {
-          if (link.parentNode) {
-            document.body.removeChild(link);
-          }
-          window.URL.revokeObjectURL(url);
-        } catch (e) {}
-      }, 3000);
-      
-      toast.success('File downloaded successfully');
-    } catch (error: any) {
-      console.error('Download error:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to download file';
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
+        try { document.body.removeChild(link); } catch (_) {}
+      }, 1000);
+      toast.success('Download started');
+      return;
     }
+
+    // Fallback: legacy blob-based download (used if stream_url is unavailable)
+    setLoading(true);
+    fetchDataFromAPI(
+      'bucket/file/download',
+      'post',
+      { file_id: fileId, bucket_id: params?.id },
+      user,
+      undefined,
+      'blob'
+    ).then((response: any) => {
+      const blob = response.data;
+      const headers = response.headers || {};
+      let filename = fileName || 'download';
+      if (!fileName) {
+        const cd = headers['content-disposition'] || headers['Content-Disposition'];
+        if (cd) {
+          const m = cd.match(/filename\*=UTF-8''([^;\n]*)/i);
+          if (m?.[1]) { try { filename = decodeURIComponent(m[1].trim()); } catch (_) {} }
+          else {
+            const m2 = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
+            if (m2?.[1]) { try { filename = decodeURIComponent(m2[1].replace(/^['"]|['"]$/g, '').trim()); } catch (_) {} }
+          }
+        }
+      }
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url; link.download = filename;
+      document.body.appendChild(link); link.click();
+      setTimeout(() => {
+        try { if (link.parentNode) document.body.removeChild(link); window.URL.revokeObjectURL(url); } catch (_) {}
+      }, 3000);
+      toast.success('File downloaded successfully');
+    }).catch((error: any) => {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to download file');
+    }).finally(() => setLoading(false));
   };
 
   const handleFileChange = (event) => {
