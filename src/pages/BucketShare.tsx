@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useState, useRef} from 'react';
 
 import {motion} from 'framer-motion';
 import {
@@ -47,6 +47,20 @@ const BucketShare = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   const [showPreView, setShowPreView] = useState(false);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const cleanupVideo = () => {
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+        videoRef.current.removeAttribute('src');
+        videoRef.current.load();
+      } catch (err) {
+        console.warn('Error resetting video element:', err);
+      }
+    }
+  };
 
   const [totlaFile, setTotalFile] = useState(0);
 
@@ -155,10 +169,13 @@ const BucketShare = () => {
   };
 
   const handleCloseModal = () => {
+    cleanupVideo();
     setPassword('');
     setError('');
     setShowUploader(false);
     setShowPreView(false);
+    setMediaLoading(false);
+    setLoading(false);
   };
 
   const handleFileChange = (event) => {
@@ -174,6 +191,10 @@ const BucketShare = () => {
     };
     if (showPreView || showUploader) {
       window.addEventListener('keydown', handleKeyDown);
+    }
+    if (!showPreView) {
+      cleanupVideo();
+      setMediaLoading(false);
     }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPreView, showUploader]);
@@ -413,9 +434,10 @@ const BucketShare = () => {
   };
 
   const preView = (index) => {
+    cleanupVideo();
     setShowPreView(true);
     setFileID(index);
-    setLoading(true);
+    setMediaLoading(true);
   };
 
   const [currentIndex, setCurrentIndex] = useState(fileId || 0); // Track the current file index
@@ -431,13 +453,15 @@ const BucketShare = () => {
   // console.log('object: ', currentFile);
 
   const handlePreviousImage = () => {
+    cleanupVideo();
     setCurrentIndex((prevIndex) => Math.max(0, prevIndex - 1)); // Prevent going below index 0
-    setLoading(true);
+    setMediaLoading(true);
   };
 
   const handleNextImage = () => {
+    cleanupVideo();
     setCurrentIndex((prevIndex) => Math.min(bucket?.length - 1, prevIndex + 1)); // Prevent exceeding array bounds
-    setLoading(true);
+    setMediaLoading(true);
   };
 
   const handleDownload = async (fileId: string, fileName?: string) => {
@@ -920,32 +944,40 @@ const BucketShare = () => {
                         const videoMime = mimeType && mimeType.startsWith('video/') ? mimeType : (fileName.endsWith('.webm') ? 'video/webm' : 'video/mp4');
                         return (
                           <div className="w-full h-full flex flex-col items-center justify-center relative">
-                            {loading && (
+                            {mediaLoading && (
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-20 rounded-md pointer-events-none">
                                 <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-3" />
                                 <p className="text-white text-sm font-medium animate-pulse">Streaming video...</p>
                               </div>
                             )}
                             <video
+                              ref={videoRef}
                               key={streamUrl}
+                              src={streamUrl}
                               controls
                               autoPlay
                               playsInline
                               preload="metadata"
                               className="max-w-full max-h-[85vh] rounded-md shadow-lg"
-                              onLoadStart={() => setLoading(true)}
-                              onLoadedMetadata={() => setLoading(false)}
-                              onLoadedData={() => setLoading(false)}
-                              onCanPlay={() => setLoading(false)}
-                              onWaiting={() => setLoading(true)}
-                              onPlaying={() => setLoading(false)}
+                              onLoadStart={() => setMediaLoading(true)}
+                              onLoadedMetadata={() => setMediaLoading(false)}
+                              onLoadedData={() => setMediaLoading(false)}
+                              onCanPlay={() => setMediaLoading(false)}
+                              onSeeking={() => setMediaLoading(true)}
+                              onSeeked={() => setMediaLoading(false)}
+                              onWaiting={() => setMediaLoading(true)}
+                              onPlaying={() => setMediaLoading(false)}
                               onError={(e) => {
-                                setLoading(false);
-                                console.error('Video load error:', e);
-                                toast.error('Failed to load video');
+                                setMediaLoading(false);
+                                if (!showPreView || !videoRef.current?.getAttribute('src')) {
+                                  return;
+                                }
+                                const err = e.currentTarget.error;
+                                if (err && err.code !== MediaError.MEDIA_ERR_ABORTED) {
+                                  console.error('Video load error:', err.code, err.message);
+                                  toast.error('Failed to load video');
+                                }
                               }}>
-                              <source src={streamUrl} type={videoMime} />
-                              <source src={streamUrl} />
                               Your browser does not support the video tag.
                             </video>
                           </div>
@@ -957,8 +989,8 @@ const BucketShare = () => {
                           src={streamUrl}
                           alt={currentFile.file_name || 'Preview'}
                           className="max-w-full max-h-[85vh] object-contain rounded-md shadow-lg"
-                          onLoad={() => setLoading(false)}
-                          onError={() => setLoading(false)}
+                          onLoad={() => setMediaLoading(false)}
+                          onError={() => setMediaLoading(false)}
                         />
                       );
                     })()
@@ -1041,7 +1073,7 @@ const BucketShare = () => {
         </div>
       )}
 
-      <Toaster position="bottom-center" reverseOrder={false} />
+      {/* <Toaster position="bottom-center" reverseOrder={false} /> */}
     </>
   );
 };

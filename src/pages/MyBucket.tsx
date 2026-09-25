@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {useEffect, useState} from 'react';
+import {useEffect, useState, useRef} from 'react';
 import {fetchDataFromAPI} from '@/lib/api';
 import {getUser} from '@/lib/constants';
 import {useParams} from 'react-router-dom';
@@ -49,7 +49,21 @@ export default function MyBucket() {
 
   const [fileId, setFileID] = useState();
   const [showPreView, setShowPreView] = useState(false);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [selectedFiles, setSelectedFiles] = useState([]);
+
+  const cleanupVideo = () => {
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+        videoRef.current.removeAttribute('src');
+        videoRef.current.load();
+      } catch (err) {
+        console.warn('Error resetting video element:', err);
+      }
+    }
+  };
   const [checkedFiles, setCheckedFiles] = useState([]);
   const [showConfirm, setShowConfirm] = useState(false);
   const [bulkDownloading, setBulkDownloading] = useState(false);
@@ -81,6 +95,9 @@ export default function MyBucket() {
     };
     if (showPreView) {
       window.addEventListener('keydown', handleKeyDown);
+    } else {
+      cleanupVideo();
+      setMediaLoading(false);
     }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPreView]);
@@ -138,7 +155,10 @@ export default function MyBucket() {
   };
 
   const handleCloseModal = () => {
+    cleanupVideo();
     setShowPreView(false);
+    setMediaLoading(false);
+    setLoading(false);
   };
 
   const handleOpenModalUpload = () => {
@@ -305,9 +325,10 @@ export default function MyBucket() {
   };
 
   const preView = (index) => {
+    cleanupVideo();
     setShowPreView(true);
     setFileID(index);
-    setLoading(true);
+    setMediaLoading(true);
   };
 
   const [currentIndex, setCurrentIndex] = useState(fileId || 0); // Track the current file index
@@ -324,13 +345,15 @@ export default function MyBucket() {
   console.log('object: ', valueAfterSlash);
 
   const handlePreviousImage = () => {
+    cleanupVideo();
     setCurrentIndex((prevIndex) => Math.max(0, prevIndex - 1)); // Prevent going below index 0
-    setLoading(true);
+    setMediaLoading(true);
   };
 
   const handleNextImage = () => {
+    cleanupVideo();
     setCurrentIndex((prevIndex) => Math.min(bucket?.length - 1, prevIndex + 1)); // Prevent exceeding array bounds
-    setLoading(true);
+    setMediaLoading(true);
   };
 
   const toggleCheckbox = (fileId) => {
@@ -970,32 +993,40 @@ export default function MyBucket() {
                     const videoMime = mimeType && mimeType.startsWith('video/') ? mimeType : (fileNameLower.endsWith('.webm') ? 'video/webm' : 'video/mp4');
                     return (
                       <div className="w-full h-full flex flex-col items-center justify-center relative">
-                        {loading && (
+                        {mediaLoading && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-20 rounded-md pointer-events-none">
                             <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-3" />
                             <p className="text-white text-sm font-medium animate-pulse">Streaming video...</p>
                           </div>
                         )}
                         <video
+                          ref={videoRef}
                           key={streamUrl}
+                          src={streamUrl}
                           controls
                           autoPlay
                           playsInline
                           preload="metadata"
                           className="max-w-full max-h-[85vh] rounded-md shadow-lg"
-                          onLoadStart={() => setLoading(true)}
-                          onLoadedMetadata={() => setLoading(false)}
-                          onLoadedData={() => setLoading(false)}
-                          onCanPlay={() => setLoading(false)}
-                          onWaiting={() => setLoading(true)}
-                          onPlaying={() => setLoading(false)}
+                          onLoadStart={() => setMediaLoading(true)}
+                          onLoadedMetadata={() => setMediaLoading(false)}
+                          onLoadedData={() => setMediaLoading(false)}
+                          onCanPlay={() => setMediaLoading(false)}
+                          onSeeking={() => setMediaLoading(true)}
+                          onSeeked={() => setMediaLoading(false)}
+                          onWaiting={() => setMediaLoading(true)}
+                          onPlaying={() => setMediaLoading(false)}
                           onError={(e) => {
-                            setLoading(false);
-                            console.error('Video load error:', e);
-                            toast.error('Failed to load video.');
+                            setMediaLoading(false);
+                            if (!showPreView || !videoRef.current?.getAttribute('src')) {
+                              return;
+                            }
+                            const err = e.currentTarget.error;
+                            if (err && err.code !== MediaError.MEDIA_ERR_ABORTED) {
+                              console.error('Video load error:', err.code, err.message);
+                              toast.error('Failed to load video.');
+                            }
                           }}>
-                          <source src={streamUrl} type={videoMime} />
-                          <source src={streamUrl} />
                           Your browser does not support the video tag.
                         </video>
                       </div>
@@ -1008,9 +1039,9 @@ export default function MyBucket() {
                       <iframe
                         src={streamUrl}
                         className="w-full h-full rounded-md shadow-lg"
-                        onLoad={() => setLoading(false)}
+                        onLoad={() => setMediaLoading(false)}
                         onError={(e) => {
-                          setLoading(false);
+                          setMediaLoading(false);
                           console.error('PDF load error:', e);
                           toast.error('Failed to load PDF. URL: ' + streamUrl);
                         }}
@@ -1026,9 +1057,9 @@ export default function MyBucket() {
                         src={streamUrl}
                         alt={currentFile.file_name || 'Image'}
                         className="max-w-full max-h-[85vh] object-contain rounded-md shadow-lg"
-                        onLoad={() => setLoading(false)}
+                        onLoad={() => setMediaLoading(false)}
                         onError={(e) => {
-                          setLoading(false);
+                          setMediaLoading(false);
                           console.error('Image load error:', e, 'URL:', streamUrl);
                           toast.error('Failed to load image. URL: ' + streamUrl);
                         }}
@@ -1043,7 +1074,7 @@ export default function MyBucket() {
                   src={currentFile?.thumbnail}
                   alt={currentFile?.file_name || 'Preview'}
                   className="max-w-full max-h-[85vh] object-contain rounded-md shadow-lg"
-                  onLoad={() => setLoading(false)}
+                  onLoad={() => setMediaLoading(false)}
                 />
               )}
 
@@ -1146,7 +1177,7 @@ export default function MyBucket() {
         </div>
       )}
 
-      <Toaster position="bottom-center" reverseOrder={false} />
+      {/* <Toaster position="bottom-center" reverseOrder={false} /> */}
     </>
   );
 }
