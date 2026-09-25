@@ -917,12 +917,13 @@ const BucketShare = () => {
                       const streamUrl = currentFile.stream_url || currentFile.thumbnail;
 
                       if (isVideo) {
+                        const videoMime = mimeType && mimeType.startsWith('video/') ? mimeType : (fileName.endsWith('.webm') ? 'video/webm' : 'video/mp4');
                         return (
                           <div className="w-full h-full flex flex-col items-center justify-center relative">
                             {loading && (
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-20 rounded-md pointer-events-none">
                                 <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-3" />
-                                <p className="text-white text-sm font-medium animate-pulse">Loading / Optimizing video...</p>
+                                <p className="text-white text-sm font-medium animate-pulse">Streaming video...</p>
                               </div>
                             )}
                             <video
@@ -930,7 +931,7 @@ const BucketShare = () => {
                               controls
                               autoPlay
                               playsInline
-                              preload="auto"
+                              preload="metadata"
                               className="max-w-full max-h-[85vh] rounded-md shadow-lg"
                               onLoadStart={() => setLoading(true)}
                               onLoadedMetadata={() => setLoading(false)}
@@ -943,7 +944,7 @@ const BucketShare = () => {
                                 console.error('Video load error:', e);
                                 toast.error('Failed to load video');
                               }}>
-                              <source src={streamUrl} type="video/mp4" />
+                              <source src={streamUrl} type={videoMime} />
                               <source src={streamUrl} />
                               Your browser does not support the video tag.
                             </video>

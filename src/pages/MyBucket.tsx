@@ -967,12 +967,13 @@ export default function MyBucket() {
                   const fileNameLower = (currentFile?.file_name || '').toLowerCase();
                   const isVideo = mimeType.startsWith('video/') || fileType === 'video' || /\.(mov|mp4|m4v|mkv|webm|avi|3gp|flv|wmv)$/i.test(fileNameLower);
                   if (isVideo) {
+                    const videoMime = mimeType && mimeType.startsWith('video/') ? mimeType : (fileNameLower.endsWith('.webm') ? 'video/webm' : 'video/mp4');
                     return (
                       <div className="w-full h-full flex flex-col items-center justify-center relative">
                         {loading && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-20 rounded-md pointer-events-none">
                             <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-3" />
-                            <p className="text-white text-sm font-medium animate-pulse">Loading / Optimizing video...</p>
+                            <p className="text-white text-sm font-medium animate-pulse">Streaming video...</p>
                           </div>
                         )}
                         <video
@@ -980,7 +981,7 @@ export default function MyBucket() {
                           controls
                           autoPlay
                           playsInline
-                          preload="auto"
+                          preload="metadata"
                           className="max-w-full max-h-[85vh] rounded-md shadow-lg"
                           onLoadStart={() => setLoading(true)}
                           onLoadedMetadata={() => setLoading(false)}
@@ -993,7 +994,7 @@ export default function MyBucket() {
                             console.error('Video load error:', e);
                             toast.error('Failed to load video.');
                           }}>
-                          <source src={streamUrl} type="video/mp4" />
+                          <source src={streamUrl} type={videoMime} />
                           <source src={streamUrl} />
                           Your browser does not support the video tag.
                         </video>

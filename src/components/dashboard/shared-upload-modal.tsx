@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Upload, X, Folder, Image as ImageIcon, Plus, AlertCircle } from 'lucide-react';
+import {
+  Upload,
+  X,
+  Folder,
+  Image as ImageIcon,
+  Plus,
+  AlertCircle,
+  Sparkles,
+  Video,
+  File as FileIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -12,7 +22,13 @@ import {
 } from '@/components/ui/select';
 import { fetchDataFromAPI } from '@/lib/api';
 import { uploadFileChunked } from '@/lib/chunkedUpload';
-import { getUser } from '@/lib/constants';
+import {
+  getAuthToken,
+  getDefaultBackupBucket,
+  setDefaultBackupBucket,
+  isAutoUploadOnShareEnabled,
+  setAutoUploadOnShare,
+} from '@/lib/constants';
 import { getPendingSharedFiles, clearPendingSharedFiles } from '@/lib/sharedMedia';
 import toast from 'react-hot-toast';
 
@@ -39,6 +55,7 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
   const [isCreatingBucket, setIsCreatingBucket] = useState(false);
   const [newBucketName, setNewBucketName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [rememberDefault, setRememberDefault] = useState(false);
 
   const location = useLocation();
 
@@ -63,39 +80,115 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
     };
   }, [sharedFiles]);
 
-  const fetchBuckets = async (token?: any) => {
-    const userToken = token || JSON.parse(getUser() || 'null');
-    if (!userToken) return;
+  const fetchBuckets = async (token?: any): Promise<BucketItem[]> => {
+    const userToken = token || getAuthToken();
+    if (!userToken) return [];
     setLoadingBuckets(true);
     try {
       const res = await fetchDataFromAPI<{ data?: { bucket?: BucketItem[] } }>('user/dashboard', 'get', '', userToken);
       const list = res?.data?.bucket || [];
       setBuckets(list);
-      if (list.length > 0) {
+
+      const defaultBucket = getDefaultBackupBucket();
+      if (defaultBucket && list.some((b) => String(b.id) === String(defaultBucket))) {
+        setSelectedBucket(defaultBucket);
+      } else if (list.length > 0) {
         setSelectedBucket((prev) => prev || String(list[0].id));
       }
+      return list;
     } catch (err) {
       console.error('[SharedUploadModal] Failed to fetch buckets:', err);
+      return [];
     } finally {
       setLoadingBuckets(false);
+    }
+  };
+
+  const triggerDirectUpload = async (filesToUpload: File[], targetBucketId: string, tokenToUse: string) => {
+    if (isUploading || filesToUpload.length === 0 || !targetBucketId) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    setErrorMsg('');
+
+    const targetBucketObj = buckets.find((b) => String(b.id) === String(targetBucketId));
+    const targetName = targetBucketObj ? targetBucketObj.bucketName : 'Backup';
+
+    const toastId = toast.loading(`⚡ Auto-uploading ${filesToUpload.length} item(s) to "${targetName}"...`);
+    let completedCount = 0;
+
+    try {
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        setCurrentFileIndex(i + 1);
+        setCurrentFileName(file.name);
+
+        await uploadFileChunked({
+          file,
+          bucketId: targetBucketId,
+          token: tokenToUse,
+          onProgress: (p) => {
+            setUploadProgress(p.percent);
+            toast.loading(`[${i + 1}/${filesToUpload.length}] ${file.name} (${p.percent}%)`, {
+              id: toastId,
+            });
+          },
+        });
+
+        completedCount++;
+      }
+
+      await clearPendingSharedFiles();
+
+      toast.success(`🎉 Auto-uploaded ${completedCount} file(s) to "${targetName}"!`, {
+        id: toastId,
+      });
+
+      setIsOpen(false);
+      setSharedFiles([]);
+
+      if (onUploadSuccess) {
+        onUploadSuccess();
+      } else {
+        window.location.reload();
+      }
+    } catch (err: any) {
+      console.error('[SharedUploadModal] Auto-upload error:', err);
+      toast.error(err?.message || 'Upload failed', { id: toastId });
+      setErrorMsg(err?.message || 'Upload encountered an error');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   // Check for shared files in IndexedDB on mount, navigation, focus, or SW message
   const checkQueue = async () => {
     if (isUploading) return;
-    const userToken = JSON.parse(getUser() || 'null');
+    const userToken = getAuthToken();
     if (!userToken) return; // User must be logged in to upload
+
     try {
       const files = await getPendingSharedFiles();
       if (files && files.length > 0) {
         setSharedFiles(files);
         setIsOpen(true);
-        fetchBuckets(userToken);
+        const list = await fetchBuckets(userToken);
+
+        const defaultBucket = getDefaultBackupBucket();
+        const autoShare = isAutoUploadOnShareEnabled();
+
         // Clean URL ?shared=1 if present
         if (window.location.search.includes('shared=1')) {
           const newUrl = window.location.pathname;
           window.history.replaceState({}, '', newUrl);
+        }
+
+        // Check if Auto-Upload on share is active
+        if (autoShare && defaultBucket && list.some((b) => String(b.id) === String(defaultBucket))) {
+          setSelectedBucket(defaultBucket);
+          setTimeout(() => {
+            triggerDirectUpload(files, defaultBucket, userToken);
+          }, 500);
         }
       }
     } catch (e) {
@@ -138,7 +231,7 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
 
   const handleCreateBucket = async (e: React.FormEvent) => {
     e.preventDefault();
-    const userToken = JSON.parse(getUser() || 'null');
+    const userToken = getAuthToken();
     if (!userToken) return;
 
     if (!newBucketName.trim()) {
@@ -184,7 +277,7 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
   };
 
   const handleStartUpload = async () => {
-    const userToken = JSON.parse(getUser() || 'null');
+    const userToken = getAuthToken();
     if (!userToken) {
       setErrorMsg('Please log in to upload files');
       return;
@@ -195,58 +288,13 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
     }
     if (sharedFiles.length === 0) return;
 
-    setIsUploading(true);
-    setUploadProgress(0);
-    setErrorMsg('');
-
-    const toastId = toast.loading(`Uploading ${sharedFiles.length} shared file(s)...`);
-    let completedCount = 0;
-
-    try {
-      for (let i = 0; i < sharedFiles.length; i++) {
-        const file = sharedFiles[i];
-        setCurrentFileIndex(i + 1);
-        setCurrentFileName(file.name);
-
-        await uploadFileChunked({
-          file,
-          bucketId: selectedBucket,
-          token: userToken,
-          onProgress: (p) => {
-            setUploadProgress(p.percent);
-            toast.loading(`[${i + 1}/${sharedFiles.length}] ${file.name} (${p.percent}%)`, {
-              id: toastId,
-            });
-          },
-        });
-
-        completedCount++;
-      }
-
-      await clearPendingSharedFiles();
-
-      const chosenBucket = buckets.find((b) => String(b.id) === String(selectedBucket));
-      const targetName = chosenBucket ? chosenBucket.bucketName : 'bucket';
-
-      toast.success(`Successfully uploaded ${completedCount} file(s) to "${targetName}"!`, {
-        id: toastId,
-      });
-
-      setIsOpen(false);
-      setSharedFiles([]);
-
-      if (onUploadSuccess) {
-        onUploadSuccess();
-      } else {
-        window.location.reload();
-      }
-    } catch (err: any) {
-      console.error('[SharedUploadModal] Upload error:', err);
-      toast.error(err?.message || 'Upload failed', { id: toastId });
-      setErrorMsg(err?.message || 'Upload encountered an error');
-    } finally {
-      setIsUploading(false);
+    if (rememberDefault) {
+      setDefaultBackupBucket(selectedBucket);
+      setAutoUploadOnShare(true);
+      toast.success('Saved as default backup bucket with auto-upload enabled!');
     }
+
+    await triggerDirectUpload(sharedFiles, selectedBucket, userToken);
   };
 
   if (!isOpen || sharedFiles.length === 0) {
@@ -302,6 +350,8 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
           <div className="max-h-44 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
             {sharedFiles.map((file, idx) => {
               const previewUrl = previewUrls[idx];
+              const isVideo = file.type.startsWith('video/');
+
               return (
                 <div
                   key={idx}
@@ -314,10 +364,12 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
                           alt={file.name}
                           className="w-full h-full object-cover"
                         />
+                      ) : isVideo ? (
+                        <Video className="w-5 h-5 text-purple-400" />
                       ) : file.type.startsWith('image/') ? (
                         <ImageIcon className="w-5 h-5 text-purple-400" />
                       ) : (
-                        <Folder className="w-5 h-5 text-slate-400" />
+                        <FileIcon className="w-5 h-5 text-slate-400" />
                       )}
                     </div>
                     <div className="min-w-0">
@@ -325,7 +377,7 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
                         {file.name}
                       </p>
                       <p className="text-[11px] text-slate-400">
-                        {formatFileSize(file.size)}
+                        {formatFileSize(file.size)} &bull; {file.type || 'file'}
                       </p>
                     </div>
                   </div>
@@ -344,7 +396,7 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
         </div>
 
         {/* Destination Bucket Selection */}
-        <div className="mb-6 space-y-3">
+        <div className="mb-5 space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Choose Destination Bucket <span className="text-red-400">*</span>
@@ -366,7 +418,7 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="e.g. Gallery Photos"
+                  placeholder="e.g. Gallery Backup"
                   value={newBucketName}
                   onChange={(e) => setNewBucketName(e.target.value)}
                   className="flex-1 bg-slate-900 border border-purple-500/40 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-400"
@@ -415,6 +467,22 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
                 ))}
               </SelectContent>
             </Select>
+          )}
+
+          {/* Option: Remember as default / Google Photos auto-upload */}
+          {!isUploading && selectedBucket && (
+            <label className="flex items-center gap-2 p-2 rounded-lg bg-slate-800/40 border border-slate-700/40 cursor-pointer text-xs text-slate-300">
+              <input
+                type="checkbox"
+                checked={rememberDefault}
+                onChange={(e) => setRememberDefault(e.target.checked)}
+                className="rounded border-slate-600 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
+              />
+              <span className="flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                Always auto-upload to this bucket in future (like Google Photos)
+              </span>
+            </label>
           )}
 
           {errorMsg && (

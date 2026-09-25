@@ -3,6 +3,7 @@ import {Button} from '@/components/ui/button';
 import {StorageMetrics} from '@/components/dashboard/storage-metrics';
 import {BucketList} from '@/components/dashboard/bucket-list';
 import {FileUploader} from '@/components/dashboard/file-uploader';
+import {GallerySync} from '@/components/dashboard/gallery-sync';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import {useState} from 'react';
 import {fetchDataFromAPI} from '@/lib/api';
@@ -70,6 +71,9 @@ export default function Dashboard() {
         <div className="space-y-8">
           {/* Storage Overview */}
           <StorageMetrics />
+
+          {/* Google Photos Style Gallery Auto-Sync */}
+          <GallerySync />
 
           {/* File Upload and Bucket Management */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

@@ -47,26 +47,37 @@ export async function getPendingSharedFiles(): Promise<File[]> {
             const item = items[i];
             if (!item) continue;
 
-            const fallbackName = `shared_media_${rec.timestamp || Date.now()}_${i + 1}.jpg`;
+            const ext = item.type?.startsWith('video/')
+              ? '.mp4'
+              : item.type?.startsWith('audio/')
+              ? '.mp3'
+              : item.type === 'application/pdf'
+              ? '.pdf'
+              : item.type?.includes('png')
+              ? '.png'
+              : '.jpg';
+            const fallbackName = `shared_${rec.timestamp || Date.now()}_${i + 1}${ext}`;
+            const fileName = item.name || (item instanceof File ? item.name : '') || fallbackName;
+            const fileType = item.type || item.blob?.type || (ext === '.mp4' ? 'video/mp4' : 'image/jpeg');
 
             if (item instanceof File) {
               files.push(item);
             } else if (item instanceof Blob) {
-              const file = new File([item], (item as any).name || fallbackName, {
-                type: item.type || 'image/jpeg',
+              const file = new File([item], fileName, {
+                type: fileType,
                 lastModified: Date.now(),
               });
               files.push(file);
             } else if (item.blob instanceof Blob) {
-              const file = new File([item.blob], item.name || fallbackName, {
-                type: item.type || item.blob.type || 'image/jpeg',
+              const file = new File([item.blob], item.name || fileName, {
+                type: fileType,
                 lastModified: item.lastModified || Date.now(),
               });
               files.push(file);
             } else if (item.data || item.buffer) {
               const bufferData = item.data || item.buffer;
-              const file = new File([bufferData], item.name || fallbackName, {
-                type: item.type || 'image/jpeg',
+              const file = new File([bufferData], fileName, {
+                type: fileType,
                 lastModified: item.lastModified || Date.now(),
               });
               files.push(file);
