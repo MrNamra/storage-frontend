@@ -137,17 +137,15 @@ export function BucketList() {
   // };
 
   const handleShreStop = (code) => {
+    if (!code) return;
     fetchDataFromAPI(`bucket/end-share/${code}`, "post", "", user)
-      .then((res) => {
-        toast.success(res?.message);
-        // console.log("response:", res);
-
-        // setLoading(false); // Set loading state to false
+      .then((res: any) => {
+        toast.success(res?.message || 'Bucket sharing ended!');
         renderTableBody(); // Refresh the bucket list
       })
       .catch((error) => {
-        toast.error(res?.message);
-        console.error("Error updating bucket:", error);
+        toast.error(error?.response?.data?.message || error?.message || 'Failed to stop sharing');
+        console.error("Error stopping bucket share:", error);
         setLoading(false); // Set loading state to false
         if (error?.status === 401) {
           // Perform logout on unauthorized error
@@ -235,10 +233,9 @@ export function BucketList() {
         toast.success(res?.message || 'Bucket shared successfully');
 
         const shareCode = res?.data?.code || res?.code;
-        const origin = front_url || (typeof window !== 'undefined' ? window.location.origin : '');
-        const url = `${origin}/bucket/${shareCode}`;
-
-        if (url) {
+        if (shareCode) {
+          const origin = front_url || (typeof window !== 'undefined' ? window.location.origin : '');
+          const url = `${origin}/bucket/${shareCode}`;
           await copyToClipboard(url);
           toast.success('URL copied to clipboard!');
         }
@@ -269,6 +266,10 @@ export function BucketList() {
   };
 
   const btnCopy = async (code) => {
+    if (!code) {
+      toast.error('Share code not found');
+      return;
+    }
     const origin = front_url || (typeof window !== 'undefined' ? window.location.origin : '');
     const url = `${origin}/bucket/${code}`;
 
@@ -340,53 +341,55 @@ export function BucketList() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {buckets.map((bucket) => (
-            <TableRow key={bucket.id}>
-              <TableCell className="font-medium" onClick={() => handleView(bucket?.id)} >{bucket.bucketName}</TableCell>
-              <TableCell>
-                {moment(bucket.createdAt).format("DD/MM/YYYY")}
-              </TableCell>
-              {/* <TableCell>{bucket.storage?.toFixed(2)}</TableCell> */}
-              <TableCell>
-                {bucket?.code !== null ? (
-                  <>
+          {buckets.map((bucket) => {
+            const shareCode = bucket?.code || bucket?.share?.code || null;
+            const isShared = Boolean(shareCode);
+
+            return (
+              <TableRow key={bucket.id}>
+                <TableCell className="font-medium" onClick={() => handleView(bucket?.id)} >{bucket.bucketName}</TableCell>
+                <TableCell>
+                  {moment(bucket.createdAt || bucket.created_at).format("DD/MM/YYYY")}
+                </TableCell>
+                {/* <TableCell>{bucket.storage?.toFixed(2)}</TableCell> */}
+                <TableCell>
+                  {isShared ? (
                     <span
                       role="button"
-                      onClick={() => btnCopy(bucket?.code)}
+                      onClick={() => btnCopy(shareCode)}
                       className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 cursor-pointer hover:bg-green-200 transition-colors select-none"
                     >
                       Shared <Copy size={15} className="ms-1" />
                     </span>
-                  </>
-                ) : (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    Private
-                  </span>
-                )}
-              </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="focus:outline-none">
-                    <MoreVertical className="h-5 w-5 text-gray-500" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {bucket?.code !== null && (
-                      <DropdownMenuItem
-                        onClick={() => handleShreStop(bucket?.code)}
-                      >
-                        <StopCircle className="h-4 w-4 mr-2" />
-                        Stop
-                      </DropdownMenuItem>
-                    )}
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      Private
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="focus:outline-none">
+                      <MoreVertical className="h-5 w-5 text-gray-500" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {isShared && (
+                        <DropdownMenuItem
+                          onClick={() => handleShreStop(shareCode)}
+                        >
+                          <StopCircle className="h-4 w-4 mr-2" />
+                          Stop
+                        </DropdownMenuItem>
+                      )}
 
-                    {bucket?.code === null && (
-                      <DropdownMenuItem
-                        onClick={() => handleShare(bucket?.id)}
-                      >
-                        <Share className="h-4 w-4 mr-2" />
-                        Share
-                      </DropdownMenuItem>
-                    )}
+                      {!isShared && (
+                        <DropdownMenuItem
+                          onClick={() => handleShare(bucket?.id)}
+                        >
+                          <Share className="h-4 w-4 mr-2" />
+                          Share
+                        </DropdownMenuItem>
+                      )}
 
                     <DropdownMenuItem
                       onClick={() =>
@@ -416,7 +419,8 @@ export function BucketList() {
                 </DropdownMenu>
               </TableCell>
             </TableRow>
-          ))}
+          );
+        })}
         </TableBody>
       </Table>
 

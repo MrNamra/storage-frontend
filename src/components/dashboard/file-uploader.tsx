@@ -216,7 +216,7 @@ export function FileUploader() {
           )}
         </motion.div>
       )}
-      <Toaster position="bottom-center" reverseOrder={false} />
+      {/* <Toaster position="bottom-center" reverseOrder={false} /> */}
     </div>
   );
 }
