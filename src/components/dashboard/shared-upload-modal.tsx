@@ -520,7 +520,7 @@ export function SharedUploadModal({ onUploadSuccess }: SharedUploadModalProps) {
             </div>
             <Progress value={uploadProgress} className="h-2 bg-slate-800" />
             <p className="text-[11px] text-slate-400 text-center animate-pulse">
-              Sending chunks securely to Telegram storage...
+              Sending chunks securely to cloud storage...
             </p>
           </div>
         )}

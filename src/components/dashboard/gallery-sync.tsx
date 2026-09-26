@@ -376,7 +376,7 @@ export function GallerySync() {
           </div>
           <Progress value={syncProgress} className="h-2 bg-slate-950" />
           <p className="text-[11px] text-slate-400 text-center animate-pulse">
-            Securely streaming chunks to Telegram Cloud...
+            Securely streaming chunks to cloud storage...
           </p>
         </div>
       )}

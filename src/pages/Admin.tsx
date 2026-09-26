@@ -796,7 +796,7 @@ export default function Admin() {
                   className="w-full bg-slate-900 border border-purple-500/40 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-purple-400"
                 />
                 <p className="text-[10px] text-slate-400">
-                  Controls how many total buckets this user is allowed to create in Telegram storage.
+                  Controls how many total buckets this user is allowed to create in cloud storage.
                 </p>
               </div>
 

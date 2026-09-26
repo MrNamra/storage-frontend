@@ -94,7 +94,7 @@ export default function NotFound({
 
         {/* Footer brand branding */}
         <div className="mt-12 text-xs text-gray-400 dark:text-gray-600">
-          CloudVault &bull; Secure Telegram Cloud Storage
+          CloudVault &bull; Secure Cloud Storage
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@ import { fetchDataFromAPI } from './api';
 export const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk
 
 export interface ChunkUploadProgress {
-  phase: 'init' | 'uploading_chunks' | 'assembling' | 'uploading_to_telegram' | 'completed' | 'error';
+  phase: 'init' | 'uploading_chunks' | 'assembling' | 'uploading_to_cloud' | 'completed' | 'error';
   percent: number; // 0..100
   chunkIndex: number;
   totalChunks: number;
@@ -184,7 +184,7 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
     throw new Error('Upload cancelled');
   }
 
-  // 3. Signal server to assemble chunks and transfer to Telegram in background
+  // 3. Signal server to assemble chunks and transfer to cloud in background
   onProgress?.({
     phase: 'assembling',
     percent: 82,
@@ -208,13 +208,13 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
 
   // 4. Poll background status until complete (prevents HTTP timeouts!)
   onProgress?.({
-    phase: 'uploading_to_telegram',
+    phase: 'uploading_to_cloud',
     percent: 85,
     chunkIndex: totalChunks,
     totalChunks,
     uploadedBytes: file.size,
     totalBytes: file.size,
-    message: 'Transferring to Telegram Cloud in background...',
+    message: 'Transferring to Cloud in background...',
   });
 
   return new Promise((resolve, reject) => {
@@ -232,7 +232,7 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
       pollCount++;
       if (pollCount > maxPolls) {
         clearInterval(pollInterval);
-        reject(new Error('Upload timed out waiting for Telegram confirmation'));
+        reject(new Error('Upload timed out waiting for server confirmation'));
         return;
       }
 
@@ -240,7 +240,7 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
         const statusRes = await fetchDataFromAPI<{
           success: boolean;
           data: {
-            status: 'processing' | 'uploading_to_telegram' | 'completed' | 'failed';
+            status: 'processing' | 'uploading' | 'uploading_to_cloud' | 'completed' | 'failed' | string;
             progress?: number;
             message?: string;
             error?: string;
@@ -258,7 +258,7 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
             totalChunks,
             uploadedBytes: file.size,
             totalBytes: file.size,
-            message: 'File successfully uploaded to Telegram Cloud!',
+            message: 'File successfully uploaded to Cloud!',
           });
           resolve({
             uploadId,
@@ -270,7 +270,7 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
 
         if (s.status === 'failed') {
           clearInterval(pollInterval);
-          const errorMsg = s.error || s.message || 'Telegram upload failed';
+          const errorMsg = s.error || s.message || 'Cloud upload failed';
           onProgress?.({
             phase: 'error',
             percent: 0,
@@ -285,18 +285,18 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
           return;
         }
 
-        // Telegram upload in progress (maps 0..100% to overall 80..99%)
+        // Cloud upload in progress (maps 0..100% to overall 80..99%)
         const tgProgress = Math.max(0, Math.min(100, s.progress ?? 0));
         const overall = 80 + Math.round((tgProgress * 19) / 100);
 
         onProgress?.({
-          phase: 'uploading_to_telegram',
+          phase: 'uploading_to_cloud',
           percent: overall,
           chunkIndex: totalChunks,
           totalChunks,
           uploadedBytes: file.size,
           totalBytes: file.size,
-          message: s.message || `Transferring to Telegram Cloud (${tgProgress}%)...`,
+          message: s.message || `Transferring to Cloud (${tgProgress}%)...`,
         });
       } catch (err: any) {
         // If single poll fails, don't crash immediately, wait for next tick
