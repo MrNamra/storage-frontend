@@ -130,6 +130,12 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
     formData.append('upload_id', uploadId);
     formData.append('chunk_index', String(chunkIdx));
     formData.append('chunk', chunkBlob, `chunk_${chunkIdx}`);
+    if (code) {
+      formData.append('code', code);
+    }
+    if (password) {
+      formData.append('password', password);
+    }
 
     // Retry loop: retry up to 3 times on transient network error
     let attempts = 0;
@@ -174,7 +180,8 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
         if (isFatalError) {
           // Signal server to cancel session and purge partial chunks
           try {
-            await fetchDataFromAPI(`upload/cancel/${uploadId}`, 'post', {}, token);
+            const cancelUrl = `upload/cancel/${uploadId}${code ? `?code=${encodeURIComponent(code)}` : ''}`;
+            await fetchDataFromAPI(cancelUrl, 'post', { code, password }, token);
           } catch (_) {}
 
           throw new Error(
@@ -233,6 +240,10 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
     resumed: isResumed,
   });
 
+  const completePayload: Record<string, any> = { upload_id: uploadId };
+  if (code) completePayload.code = code;
+  if (password) completePayload.password = password;
+
   const completeRes = await fetchDataFromAPI<{
     success: boolean;
     data: {
@@ -241,7 +252,7 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
       file_name: string;
     };
     message: string;
-  }>('upload/complete', 'post', { upload_id: uploadId }, token);
+  }>('upload/complete', 'post', completePayload, token);
 
   // 4. Poll background status until complete (prevents HTTP timeouts!)
   onProgress?.({
@@ -274,6 +285,7 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
       }
 
       try {
+        const statusUrl = `upload/status/${uploadId}${code ? `?code=${encodeURIComponent(code)}` : ''}`;
         const statusRes = await fetchDataFromAPI<{
           success: boolean;
           data: {
@@ -282,7 +294,7 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
             message?: string;
             error?: string;
           };
-        }>(`upload/status/${uploadId}`, 'get', null, token);
+        }>(statusUrl, 'get', null, token);
 
         const s = statusRes.data;
 
