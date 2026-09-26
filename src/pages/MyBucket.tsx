@@ -460,8 +460,7 @@ export default function MyBucket() {
       })
       .catch((error) => {
         setLoading(false);
-        toast.error(res?.message)
-
+        toast.error(error?.response?.data?.message || error?.message || 'Action failed');
         console.log('error', error);
       });
   };

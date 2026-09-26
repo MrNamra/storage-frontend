@@ -37,14 +37,16 @@ const BucketShare = () => {
   const [sortColumn, setSortColumn] = useState('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showUploader, setShowUploader] = useState(false);
-  const [bucket, setBucket] = useState([]);
-  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [bucket, setBucket] = useState<any[]>([]);
+  const [bucketDetails, setBucketDetails] = useState<any>(null);
+  const [selectedFiles, setSelectedFiles] = useState<any[]>([]);
   console.log('first selected files', selectedFiles);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totlaStorage, setStorage] = useState<number>(0);
 
   const [showPreView, setShowPreView] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(false);
@@ -212,11 +214,15 @@ const BucketShare = () => {
       '',
       '',
     )
-      .then((res) => {
-        const files = Array.isArray(res?.data) ? res.data : (res?.data?.files || []);
+      .then((res: any) => {
+        const files = Array.isArray(res?.data) ? res.data : (res?.data?.files || res?.files || []);
         const pagination = res?.pagination || res?.data?.pagination;
-        const total = pagination?.totalFiles ?? files.length;
+        const total = pagination?.totalFiles ?? res?.totalFiles ?? files.length;
         const pages = pagination?.totalPages ?? Math.max(1, Math.ceil(total / 15));
+        const bInfo = res?.data?.bucket || res?.bucket || null;
+        if (bInfo) {
+          setBucketDetails(bInfo);
+        }
 
         setBucket(files);
         setTotalFile(total);
@@ -227,11 +233,14 @@ const BucketShare = () => {
         }
       })
       .catch((error) => {
-        console.log('error', error);
+        console.error('BucketShare load error:', error);
         const errStatus = error?.response?.status || error?.status;
-        if (errStatus === 404 || errStatus === 500 || !errStatus) {
+        if (errStatus === 404) {
           setCheckStatus(true);
-          setIs404(errStatus === 404 || !errStatus);
+          setIs404(true);
+        } else if (errStatus === 500) {
+          setCheckStatus(true);
+          setIs404(false);
         }
       });
   };
@@ -552,6 +561,13 @@ const BucketShare = () => {
                     CloudVault
                   </span>
                 </Link>
+
+                {bucketDetails?.bucketName && (
+                  <div className="flex items-center space-x-2 text-sm text-gray-700 bg-purple-50 px-3 py-1.5 rounded-full border border-purple-200">
+                    <span className="text-gray-500">Shared Bucket:</span>
+                    <span className="font-semibold text-purple-700">{bucketDetails.bucketName}</span>
+                  </div>
+                )}
 
                 {/* Search Bar */}
               </div>
