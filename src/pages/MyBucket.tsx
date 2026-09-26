@@ -816,15 +816,18 @@ export default function MyBucket() {
                           {/*
                       <ImageLoader key={file.fileId} fileId={file.fileId} />
                         */}
-                          <img
-                            src={file.thumbnail}
-                            alt="Thumbnail"
-                            style={{
-                              width: '100px',
-                              height: '100px',
-                              objectFit: 'cover', // or 'contain' if you want to preserve the aspect ratio within the specified dimensions
-                            }}
-                          />
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                            <img
+                              src={file.thumbnail}
+                              alt={file.file_name || 'Thumbnail'}
+                              loading="lazy"
+                              className="w-full h-full object-cover transition-transform duration-200 hover:scale-105"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                              }}
+                            />
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-gray-500 dark:text-gray-400">

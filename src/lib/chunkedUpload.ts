@@ -144,23 +144,60 @@ export async function uploadFileChunked(options: UploadFileOptions): Promise<{
 
       attempts++;
       try {
-        await fetchDataFromAPI('upload/chunk', 'post', formData, token);
+        const res = await fetchDataFromAPI<{ success: boolean; message?: string }>(
+          'upload/chunk',
+          'post',
+          formData,
+          token
+        );
+        if (res && res.success === false) {
+          throw new Error(res.message || `Server rejected chunk ${chunkIdx + 1}`);
+        }
         uploaded = true;
         existingChunks.add(chunkIdx);
       } catch (err: any) {
         lastError = err;
+        const statusCode = err?.response?.status || err?.status;
+        const errMsg =
+          err?.response?.data?.message || err?.message || 'Chunk upload failed';
+
+        // Fatal client, auth, session, or server rejection: STOP ALL NEXT CHUNKS IMMEDIATELY!
+        const isFatalError =
+          (statusCode && statusCode >= 400) ||
+          errMsg.toLowerCase().includes('aborted') ||
+          errMsg.toLowerCase().includes('failed') ||
+          errMsg.toLowerCase().includes('denied') ||
+          errMsg.toLowerCase().includes('rejected') ||
+          errMsg.toLowerCase().includes('session') ||
+          signal?.aborted;
+
+        if (isFatalError) {
+          // Signal server to cancel session and purge partial chunks
+          try {
+            await fetchDataFromAPI(`upload/cancel/${uploadId}`, 'post', {}, token);
+          } catch (_) {}
+
+          throw new Error(
+            `Upload error on chunk ${chunkIdx + 1}/${totalChunks}: ${errMsg}. All remaining chunks stopped.`
+          );
+        }
+
         if (attempts < maxAttempts && !signal?.aborted) {
-          // Exponential backoff
-          await new Promise((resolve) => setTimeout(resolve, attempts * 1200));
+          // Exponential backoff only for transient network socket disconnects
+          await new Promise((resolve) => setTimeout(resolve, attempts * 1000));
         }
       }
     }
 
     if (!uploaded) {
+      try {
+        await fetchDataFromAPI(`upload/cancel/${uploadId}`, 'post', {}, token);
+      } catch (_) {}
+
       throw new Error(
         lastError?.response?.data?.message ||
           lastError?.message ||
-          `Failed uploading chunk ${chunkIdx + 1} of ${totalChunks} after ${maxAttempts} attempts`
+          `Failed uploading chunk ${chunkIdx + 1} of ${totalChunks}. All remaining chunks stopped.`
       );
     }
 
