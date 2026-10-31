@@ -1,8 +1,8 @@
-import {Plus, Download, Upload, File} from 'lucide-react';
+import {Plus, Download, Upload, File, LayoutGrid, List, Film, Music} from 'lucide-react';
 import {Button} from '@/components/ui/button';
-import {StorageMetrics} from '@/components/dashboard/storage-metrics';
-import {BucketList} from '@/components/dashboard/bucket-list';
-import {FileUploader} from '@/components/dashboard/file-uploader';
+// import {StorageMetrics} from '@/components/dashboard/storage-metrics';
+// import {BucketList} from '@/components/dashboard/bucket-list';
+// import {FileUploader} from '@/components/dashboard/file-uploader';
 import toast, { Toaster } from "react-hot-toast";
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import {
@@ -36,16 +36,16 @@ export default function MyBucket() {
   const params = useParams();
   const user = JSON.parse(getUser());
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDeleteEnable, setIsDeleteEnable] = useState(false);
+  // const [isModalOpen, setIsModalOpen] = useState(false);
+  // const [isDeleteEnable, setIsDeleteEnable] = useState(false);
   const [bucketName, setBucketName] = useState('');
-  const [error, setError] = useState('');
+  // const [error, setError] = useState('');
   const [bucket, setBucket] = useState([]);
   const [loading, setLoading] = useState(false); // State for loading
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [notFound, setNotFound] = useState(false);
-  const [password, setPassword] = useState('');
+  // const [password, setPassword] = useState('');
 
   const [fileId, setFileID] = useState();
   const [showPreView, setShowPreView] = useState(false);
@@ -77,8 +77,8 @@ export default function MyBucket() {
   const [bulkAbortController, setBulkAbortController] = useState<AbortController | null>(null);
 
   const [totlaFile, setTotalFile] = useState(0);
-  const [totlaStorage, setStorage] = useState(0);
-  const [showUploader, setShowUploader] = useState(false);
+  // const [totlaStorage, setStorage] = useState(0);
+  // const [showUploader, setShowUploader] = useState(false);
 
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
@@ -86,6 +86,28 @@ export default function MyBucket() {
   const [uploadCurrentFile, setUploadCurrentFile] = useState('');
   const [uploadCurrentFileIndex, setUploadCurrentFileIndex] = useState(0);
   const [uploadAbortController, setUploadAbortController] = useState<AbortController | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = () => {
+    const nextDir = sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortDirection(nextDir);
+    setBucket((prev: any[]) =>
+      [...prev].sort((a: any, b: any) => {
+        const valA = (a.file_name || '').toLowerCase();
+        const valB = (b.file_name || '').toLowerCase();
+        return nextDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      })
+    );
+  };
+
+  const formatSize = (bytes?: number) => {
+    if (!bytes || bytes <= 0) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -133,7 +155,7 @@ export default function MyBucket() {
 
         setBucket(files);
         setTotalFile(total);
-        setStorage(res?.totalStorage ?? res?.data?.totalStorage ?? 0);
+        // setStorage(res?.totalStorage ?? res?.data?.totalStorage ?? 0);
         setTotalPages(pages);
         if (currentPage > pages && pages >= 1) {
           setCurrentPage(pages);
@@ -150,9 +172,9 @@ export default function MyBucket() {
       });
   };
 
-  const handleOpenModal = () => {
-    setShowPreView(true);
-  };
+  // const handleOpenModal = () => {
+  //   setShowPreView(true);
+  // };
 
   const handleCloseModal = () => {
     cleanupVideo();
@@ -161,13 +183,13 @@ export default function MyBucket() {
     setLoading(false);
   };
 
-  const handleOpenModalUpload = () => {
-    setShowUploader(true);
-  };
+  // const handleOpenModalUpload = () => {
+  //   setShowUploader(true);
+  // };
 
-  const handleCloseModalUpload = () => {
-    setShowUploader(false);
-  };
+  // const handleCloseModalUpload = () => {
+  //   setShowUploader(false);
+  // };
 
   const handleCancelUpload = () => {
     if (uploadAbortController) {
@@ -721,172 +743,326 @@ export default function MyBucket() {
           </motion.div>
         </div>
 
-        <div className="space-y-8 mt-8">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[60px]">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={bucket?.length > 0 && checkedFiles.length === bucket?.length}
-                        onChange={toggleSelectAll}
-                        className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
-                        title={checkedFiles.length === bucket?.length ? "Deselect All" : "Select All"}
+        <div className="space-y-6 mt-8">
+          {/* Action Toolbar */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700/60 p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center flex-wrap gap-2 sm:gap-3">
+                <label className="flex items-center space-x-2 cursor-pointer select-none text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">
+                  <input
+                    type="checkbox"
+                    checked={bucket?.length > 0 && checkedFiles.length === bucket?.length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
+                    title={checkedFiles.length === bucket?.length ? "Deselect All" : "Select All"}
+                  />
+                  <span className="text-xs sm:text-sm">
+                    {checkedFiles.length > 0 ? `${checkedFiles.length} selected` : 'Select All'}
+                  </span>
+                </label>
+
+                {checkedFiles.length > 0 ? (
+                  <>
+                    <Button
+                      size="sm"
+                      className="bg-purple-600 hover:bg-purple-700 text-white flex items-center space-x-1.5 h-8 px-3 text-xs shadow-sm"
+                      onClick={() => handleBulkDownload()}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Download ({checkedFiles.length})</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setShowConfirm(true)}
+                      className="h-8 px-3 text-xs flex items-center space-x-1 shadow-sm"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Delete ({checkedFiles.length})</span>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSort('name')}
+                      className="flex items-center space-x-1.5 h-8 px-2.5 text-xs text-gray-600 dark:text-gray-300 hover:text-purple-600">
+                      <span>Sort by name</span>
+                    </Button>
+                    {bucket?.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleBulkDownload(bucket)}
+                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 h-8 px-2.5 text-xs flex items-center space-x-1.5"
+                        title="Download all files in this bucket"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        <span>Download All ({bucket.length})</span>
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* View Switcher: Cards vs List */}
+              <div className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700/60 p-1 rounded-lg self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-md text-xs font-medium flex items-center space-x-1.5 transition-colors ${
+                    viewMode === 'grid'
+                      ? 'bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`}
+                  title="Cards view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  <span className="text-xs">Cards</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded-md text-xs font-medium flex items-center space-x-1.5 transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  }`}
+                  title="List view"
+                >
+                  <List className="h-4 w-4" />
+                  <span className="text-xs">List</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Files display */}
+          {!bucket || bucket.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-12 text-center text-gray-500 dark:text-gray-400">
+              <File className="mx-auto h-12 w-12 text-gray-400 mb-3 opacity-60" />
+              <p className="font-medium text-base text-gray-700 dark:text-gray-300">No files found</p>
+              <p className="text-xs mt-1 text-gray-400">Upload files above to store and view them in this bucket.</p>
+            </div>
+          ) : viewMode === 'grid' ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+              {bucket.map((file: any, index: number) => {
+                const isSelected = checkedFiles.includes(file.msg_id);
+                return (
+                  <div
+                    key={file?.msg_id || index}
+                    onClick={() => preView(index)}
+                    className={`group relative bg-white dark:bg-gray-800 rounded-xl border transition-all duration-200 overflow-hidden cursor-pointer flex flex-col shadow-sm hover:shadow-md ${
+                      isSelected
+                        ? 'border-purple-600 ring-2 ring-purple-600/30 dark:border-purple-400 bg-purple-50/10'
+                        : 'border-gray-200 dark:border-gray-700/80 hover:border-purple-300 dark:hover:border-purple-500/60'
+                    }`}
+                  >
+                    {/* Thumbnail preview */}
+                    <div className="relative aspect-square w-full bg-gray-100 dark:bg-gray-900/60 overflow-hidden flex items-center justify-center">
+                      <img
+                        src={file.thumbnail}
+                        alt={file.file_name || 'Thumbnail'}
+                        loading="lazy"
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src =
+                            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                        }}
                       />
-                    </div>
-                  </TableHead>
-                  <TableHead className="min-w-[340px]">
-                    <div className="flex items-center space-x-2">
-                      {checkedFiles.length > 0 ? (
-                        <>
-                          <Button
-                            size="sm"
-                            className="bg-purple-600 hover:bg-purple-700 text-white flex items-center space-x-1.5 h-8 px-3 text-xs"
-                            onClick={() => handleBulkDownload()}
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            <span>Download ({checkedFiles.length})</span>
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => setShowConfirm(true)}
-                            className="h-8 px-3 text-xs flex items-center space-x-1"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span>Delete ({checkedFiles.length})</span>
-                          </Button>
-                        </>
-                      ) : (
-                        <div className="flex items-center space-x-3">
-                          <Button
-                            variant="ghost"
-                            onClick={() => handleSort('name')}
-                            className="flex items-center space-x-2 h-8 px-2">
-                            <span>File</span>
-                          </Button>
-                          {bucket?.length > 0 && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleBulkDownload(bucket)}
-                              className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 h-8 px-2.5 text-xs flex items-center space-x-1.5"
-                              title="Download all files in this bucket"
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              <span>Download All ({bucket.length})</span>
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead>File Name</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bucket?.map((file, index) => {
-                  return (
-                    <TableRow>
-                      <TableCell className="text-gray-500 dark:text-gray-400">
+
+                      {/* Floating Checkbox (top-left) */}
+                      <div
+                        className="absolute top-2 left-2 z-10 p-1 rounded-md bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <input
                           type="checkbox"
-                          checked={checkedFiles.includes(file.msg_id)}
+                          checked={isSelected}
                           onChange={() => toggleCheckbox(file.msg_id)}
-                          className="w-4 h-4 accent-purple-600 cursor-pointer"
+                          className="w-4 h-4 accent-purple-600 cursor-pointer block rounded"
                         />
-                      </TableCell>
-                      <TableCell key={file?.msg_id}
-                      role="button"
-                      onClick={() => preView(index)}>
-                        <div className="flex items-center space-x-3">
-                          {/* <span className="font-medium dark:text-white">
-                            {file.file_name}
-                          </span> */}
-                          {/*
-                        <img
-                        src={`http://storage.raju.serv00.net/api/thumbnil/${file.fileId}/awards-logo.png`}
-                        alt={`${file.fileName}`}
-                        style={{width: '100px', height: 'auto'}}
-                        />
-                        */}
-                          {/*
-                      <ImageLoader key={file.fileId} fileId={file.fileId} />
-                        */}
-                          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center flex-shrink-0 shadow-sm">
-                            <img
-                              src={file.thumbnail}
-                              alt={file.file_name || 'Thumbnail'}
-                              loading="lazy"
-                              className="w-full h-full object-cover transition-transform duration-200 hover:scale-105"
-                              onError={(e) => {
-                                e.currentTarget.onerror = null;
-                                e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-gray-500 dark:text-gray-400">
-                        {file.file_name}
-                      </TableCell>
+                      </div>
 
-                      <TableCell className="text-gray-500 dark:text-gray-400">
-                        {moment(file.uploadedAt).format('YYYY-MM-DD')}
-                      </TableCell>
-
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      {/* Dropdown Menu (top-right) */}
+                      <div
+                        className="absolute top-2 right-2 z-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-5 w-5" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 rounded-md bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                            >
+                              <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               onClick={() => handleDownload(file?.msg_id, file?.file_name, file)}
-                              className="text-blue-600 dark:text-blue-400">
-                                <Download className="h-4 w-4 mr-2" />
-                                Download
+                              className="text-blue-600 dark:text-blue-400"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Download
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleDelete(file?.msg_id)}
-                              className="text-red-600 dark:text-red-400">
+                              className="text-red-600 dark:text-red-400"
+                            >
                               <Trash2 className="h-4 w-4 mr-2" />
                               Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                      </div>
 
-            {/* Pagination */}
-            <div className="flex justify-center items-center flex-wrap gap-2 mt-4 mb-3">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage <= 1}
-                className="px-3.5 py-1.5 border rounded-lg text-sm bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm font-medium">
-                Previous
-              </button>
+                      {/* Type badge */}
+                      {(file.type === 'video' || file.mime_type?.startsWith('video/')) && (
+                        <span className="absolute bottom-2 left-2 z-10 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-black/70 text-white backdrop-blur-sm flex items-center gap-1 shadow-sm">
+                          <Film className="w-3 h-3" /> Video
+                        </span>
+                      )}
+                      {(file.type === 'audio' || file.mime_type?.startsWith('audio/')) && (
+                        <span className="absolute bottom-2 left-2 z-10 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-black/70 text-white backdrop-blur-sm flex items-center gap-1 shadow-sm">
+                          <Music className="w-3 h-3" /> Audio
+                        </span>
+                      )}
+                    </div>
 
-              <div className="flex items-center">
-                {renderPagination()}
-              </div>
-
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage >= (totalPages || 1)}
-                className="px-3.5 py-1.5 border rounded-lg text-sm bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm font-medium">
-                Next
-              </button>
+                    {/* Card metadata footer */}
+                    <div className="p-2.5 sm:p-3 flex flex-col justify-between flex-1 gap-1 border-t border-gray-100 dark:border-gray-700/50">
+                      <p
+                        className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors"
+                        title={file.file_name}
+                      >
+                        {file.file_name}
+                      </p>
+                      <div className="flex items-center justify-between text-[11px] text-gray-400 dark:text-gray-500">
+                        <span>{moment(file.uploadedAt || (file.date ? file.date * 1000 : undefined)).format('YYYY-MM-DD')}</span>
+                        {file.size ? <span>{formatSize(file.size)}</span> : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700/60">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[60px]">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={bucket?.length > 0 && checkedFiles.length === bucket?.length}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
+                          title={checkedFiles.length === bucket?.length ? "Deselect All" : "Select All"}
+                        />
+                      </div>
+                    </TableHead>
+                    <TableHead className="w-[100px]">Preview</TableHead>
+                    <TableHead>File Name</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="w-[80px] text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bucket?.map((file: any, index: number) => {
+                    return (
+                      <TableRow key={file?.msg_id || index}>
+                        <TableCell className="text-gray-500 dark:text-gray-400">
+                          <input
+                            type="checkbox"
+                            checked={checkedFiles.includes(file.msg_id)}
+                            onChange={() => toggleCheckbox(file.msg_id)}
+                            className="w-4 h-4 accent-purple-600 cursor-pointer"
+                          />
+                        </TableCell>
+                        <TableCell
+                          role="button"
+                          onClick={() => preView(index)}>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                              <img
+                                src={file.thumbnail}
+                                alt={file.file_name || 'Thumbnail'}
+                                loading="lazy"
+                                className="w-full h-full object-cover transition-transform duration-200 hover:scale-105"
+                                onError={(e) => {
+                                  e.currentTarget.onerror = null;
+                                  e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell
+                          role="button"
+                          onClick={() => preView(index)}
+                          className="text-gray-700 dark:text-gray-300 font-medium">
+                          {file.file_name}
+                        </TableCell>
+
+                        <TableCell className="text-gray-500 dark:text-gray-400">
+                          {moment(file.uploadedAt || (file.date ? file.date * 1000 : undefined)).format('YYYY-MM-DD')}
+                        </TableCell>
+
+                        <TableCell onClick={(e) => e.stopPropagation()} className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleDownload(file?.msg_id, file?.file_name, file)}
+                                className="text-blue-600 dark:text-blue-400">
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Download
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDelete(file?.msg_id)}
+                                className="text-red-600 dark:text-red-400">
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          <div className="flex justify-center items-center flex-wrap gap-2 mt-4 mb-3">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage <= 1}
+              className="px-3.5 py-1.5 border rounded-lg text-sm bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm font-medium">
+              Previous
+            </button>
+
+            <div className="flex items-center">
+              {renderPagination()}
+            </div>
+
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage >= (totalPages || 1)}
+              className="px-3.5 py-1.5 border rounded-lg text-sm bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm font-medium">
+              Next
+            </button>
           </div>
         </div>
       </DashboardLayout>
