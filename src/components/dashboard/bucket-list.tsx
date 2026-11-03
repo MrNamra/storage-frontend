@@ -34,12 +34,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import toast from "react-hot-toast";
 
-interface BucketListProps {
-  onUploadToBucket?: (bucketId: string | number) => void;
-  onBackupBucket?: (bucketId: string | number) => void;
-}
-
-export function BucketList({ onUploadToBucket, onBackupBucket }: BucketListProps = {}) {
+export function BucketList() {
   const user = JSON.parse(getUser() || 'null');
   const navigate = useNavigate();
 
@@ -262,26 +257,6 @@ export function BucketList({ onUploadToBucket, onBackupBucket }: BucketListProps
                       <DropdownMenuItem onClick={() => handleOpenBucket(bucket.id)} className="gap-2">
                         <Eye className="w-3.5 h-3.5 text-blue-500" /> Open Drive
                       </DropdownMenuItem>
-                      {onUploadToBucket && (
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onUploadToBucket(bucket.id);
-                          }}
-                          className="gap-2">
-                          <UploadCloud className="w-3.5 h-3.5 text-blue-600" /> Upload / Restore
-                        </DropdownMenuItem>
-                      )}
-                      {onBackupBucket && (
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onBackupBucket(bucket.id);
-                          }}
-                          className="gap-2">
-                          <Download className="w-3.5 h-3.5 text-emerald-600" /> Backup Drive (ZIP)
-                        </DropdownMenuItem>
-                      )}
                       <DropdownMenuItem
                         onClick={(e) => {
                           e.stopPropagation();
@@ -316,23 +291,9 @@ export function BucketList({ onUploadToBucket, onBackupBucket }: BucketListProps
 
                 {/* Footer Progress & Status */}
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                    {onUploadToBucket && (
-                      <button
-                        onClick={() => onUploadToBucket(bucket.id)}
-                        className="px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 font-medium text-[11px] flex items-center gap-1">
-                        <UploadCloud className="w-3 h-3" /> Upload / Restore
-                      </button>
-                    )}
-                    {onBackupBucket && (
-                      <button
-                        onClick={() => onBackupBucket(bucket.id)}
-                        className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 font-medium text-[11px] flex items-center gap-1"
-                        title="Download ZIP Backup">
-                        <Download className="w-3 h-3" /> Backup
-                      </button>
-                    )}
-                  </div>
+                  <span className="text-slate-400 text-[11px]">
+                    Personal Cloud Vault
+                  </span>
                   <span className="font-semibold text-blue-600 dark:text-blue-400 group-hover:underline">
                     Browse →
                   </span>

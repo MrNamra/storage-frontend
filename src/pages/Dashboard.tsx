@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Plus, UploadCloud, Download, HardDrive, RefreshCw, Monitor } from 'lucide-react';
+import { Plus, HardDrive, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StorageMetrics } from '@/components/dashboard/storage-metrics';
 import { BucketList } from '@/components/dashboard/bucket-list';
-import { DriveBackupRestoreModal } from '@/components/dashboard/DriveBackupRestoreModal';
 import { ConnectDriveModal } from '@/components/dashboard/ConnectDriveModal';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { fetchDataFromAPI } from '@/lib/api';
@@ -15,11 +14,6 @@ export default function Dashboard() {
   const [bucketName, setBucketName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Drive Backup & Restore Modal State
-  const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
-  const [driveModalMode, setDriveModalMode] = useState<'restore' | 'backup'>('restore');
-  const [targetBucketId, setTargetBucketId] = useState<string | number | undefined>(undefined);
   const [isConnectDriveModalOpen, setIsConnectDriveModalOpen] = useState(false);
 
   const user = JSON.parse(getUser() || 'null');
@@ -59,18 +53,6 @@ export default function Dashboard() {
       });
   };
 
-  const openDriveUploadRestore = (bucketId?: string | number) => {
-    setTargetBucketId(bucketId);
-    setDriveModalMode('restore');
-    setIsDriveModalOpen(true);
-  };
-
-  const openDriveBackup = (bucketId?: string | number) => {
-    setTargetBucketId(bucketId);
-    setDriveModalMode('backup');
-    setIsDriveModalOpen(true);
-  };
-
   return (
     <>
       {loading && (
@@ -94,7 +76,7 @@ export default function Dashboard() {
                   Cloud Drives & Personal Storage
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Store photos, videos, media, documents, and restore backups anytime
+                  Store photos, videos, media, and personal documents securely
                 </p>
               </div>
             </div>
@@ -109,24 +91,6 @@ export default function Dashboard() {
                 <Monitor className="w-3.5 h-3.5" />
                 <span>Connect PC / Mac</span>
               </Button>
-{/* 
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => openDriveBackup()}
-                className="h-9 gap-1.5 text-xs rounded-xl border-slate-200 dark:border-slate-700">
-                <Download className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Backup Drive</span>
-              </Button>
-
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => openDriveUploadRestore()}
-                className="h-9 gap-1.5 text-xs rounded-xl border-slate-200 dark:border-slate-700">
-                <UploadCloud className="w-3.5 h-3.5 text-blue-600" />
-                <span>Upload & Restore</span>
-              </Button> */}
 
               <Button
                 size="sm"
@@ -140,10 +104,7 @@ export default function Dashboard() {
 
           {/* Drive Cards / Mount Points */}
           <div className="space-y-4">
-            <BucketList
-              onUploadToBucket={(bId) => openDriveUploadRestore(bId)}
-              onBackupBucket={(bId) => openDriveBackup(bId)}
-            />
+            <BucketList />
           </div>
         </div>
 
@@ -187,15 +148,6 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-
-        {/* Global Drive Backup & Restore Modal */}
-        <DriveBackupRestoreModal
-          isOpen={isDriveModalOpen}
-          onClose={() => setIsDriveModalOpen(false)}
-          defaultBucketId={targetBucketId}
-          initialMode={driveModalMode}
-          onSuccess={() => window.location.reload()}
-        />
 
         {/* Connect as OS Drive Modal */}
         <ConnectDriveModal

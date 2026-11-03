@@ -48,7 +48,6 @@ import { BoxBoxPreviewModal } from '@/components/dashboard/BoxBoxPreviewModal';
 import { FilePropertiesModal } from '@/components/dashboard/FilePropertiesModal';
 import { UploadProgressDock } from '@/components/dashboard/UploadProgressDock';
 import { ShareModal } from '@/components/dashboard/ShareModal';
-import { DriveBackupRestoreModal } from '@/components/dashboard/DriveBackupRestoreModal';
 import { ConnectDriveModal } from '@/components/dashboard/ConnectDriveModal';
 import { formatBytes, getFileCategoryInfo, getPreviewType } from '@/lib/fileTypes';
 import NotFound from './NotFound';
@@ -85,8 +84,6 @@ export default function MyBucket() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<any | null>(null);
-  const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
-  const [driveModalMode, setDriveModalMode] = useState<'restore' | 'backup'>('restore');
   const [isConnectDriveModalOpen, setIsConnectDriveModalOpen] = useState(false);
 
   // Upload state
@@ -521,32 +518,6 @@ export default function MyBucket() {
               <span className="hidden sm:inline">Connect PC</span>
             </Button>
 
-            {/* Backup Drive Button */}
-            {/* <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setDriveModalMode('backup');
-                setIsDriveModalOpen(true);
-              }}
-              className="h-9 gap-1.5 text-xs rounded-xl border-slate-200 dark:border-slate-700">
-              <Download className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">Backup Drive</span>
-            </Button> */}
-
-            {/* Restore / Bulk Upload Button */}
-            {/* <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setDriveModalMode('restore');
-                setIsDriveModalOpen(true);
-              }}
-              className="h-9 gap-1.5 text-xs rounded-xl border-slate-200 dark:border-slate-700">
-              <Upload className="w-3.5 h-3.5 text-blue-600" />
-              <span className="hidden sm:inline">Restore Backup</span>
-            </Button> */}
-
             {/* Share Bucket Button */}
             <Button
               variant="outline"
@@ -944,15 +915,6 @@ export default function MyBucket() {
           setIsShareModalOpen(false);
         }}
         token={user}
-      />
-
-      {/* Drive Backup & Restore Modal */}
-      <DriveBackupRestoreModal
-        isOpen={isDriveModalOpen}
-        onClose={() => setIsDriveModalOpen(false)}
-        defaultBucketId={params?.id}
-        initialMode={driveModalMode}
-        onSuccess={() => loadBucketFiles(currentPage)}
       />
 
       {/* Connect PC / Mac Native Drive Modal */}

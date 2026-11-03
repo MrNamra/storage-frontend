@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {Cloud, Lock, Search, User, Shield} from 'lucide-react';
+import {Cloud, Lock, Search, User, Shield, Smartphone} from 'lucide-react';
 import {Input} from '@/components/ui/input';
 import {Link, useNavigate} from 'react-router-dom';
 import constants, {getUser} from '@/lib/constants';
@@ -140,7 +140,16 @@ export default function DashboardLayout({
             </div> */}
 
             {/* User Actions */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2.5">
+              <button
+                type="button"
+                onClick={() => (window as any).openCloudVaultGuide?.()}
+                className="hidden sm:flex items-center gap-1.5 text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg font-medium transition-colors shadow-xs"
+                title="Mobile & PWA Setup">
+                <Smartphone className="w-3.5 h-3.5 text-purple-600" />
+                <span>Mobile Setup</span>
+              </button>
+
               {currentUserRole === 'admin' && (
                 <Link
                   to="/admin"
