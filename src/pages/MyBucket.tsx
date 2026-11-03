@@ -522,7 +522,7 @@ export default function MyBucket() {
             </Button>
 
             {/* Backup Drive Button */}
-            <Button
+            {/* <Button
               variant="outline"
               size="sm"
               onClick={() => {
@@ -532,10 +532,10 @@ export default function MyBucket() {
               className="h-9 gap-1.5 text-xs rounded-xl border-slate-200 dark:border-slate-700">
               <Download className="w-3.5 h-3.5 text-emerald-600" />
               <span className="hidden sm:inline">Backup Drive</span>
-            </Button>
+            </Button> */}
 
             {/* Restore / Bulk Upload Button */}
-            <Button
+            {/* <Button
               variant="outline"
               size="sm"
               onClick={() => {
@@ -545,7 +545,7 @@ export default function MyBucket() {
               className="h-9 gap-1.5 text-xs rounded-xl border-slate-200 dark:border-slate-700">
               <Upload className="w-3.5 h-3.5 text-blue-600" />
               <span className="hidden sm:inline">Restore Backup</span>
-            </Button>
+            </Button> */}
 
             {/* Share Bucket Button */}
             <Button
