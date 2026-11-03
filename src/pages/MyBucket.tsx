@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   Cloud,
   FileCode,
+  Monitor,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,6 +49,7 @@ import { FilePropertiesModal } from '@/components/dashboard/FilePropertiesModal'
 import { UploadProgressDock } from '@/components/dashboard/UploadProgressDock';
 import { ShareModal } from '@/components/dashboard/ShareModal';
 import { DriveBackupRestoreModal } from '@/components/dashboard/DriveBackupRestoreModal';
+import { ConnectDriveModal } from '@/components/dashboard/ConnectDriveModal';
 import { formatBytes, getFileCategoryInfo, getPreviewType } from '@/lib/fileTypes';
 import NotFound from './NotFound';
 
@@ -85,6 +87,7 @@ export default function MyBucket() {
   const [fileToDelete, setFileToDelete] = useState<any | null>(null);
   const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
   const [driveModalMode, setDriveModalMode] = useState<'restore' | 'backup'>('restore');
+  const [isConnectDriveModalOpen, setIsConnectDriveModalOpen] = useState(false);
 
   // Upload state
   const [isUploading, setIsUploading] = useState(false);
@@ -506,6 +509,16 @@ export default function MyBucket() {
               className="h-9 w-9 p-0 rounded-xl"
               title="Refresh Files">
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+
+            {/* Connect PC / Mac */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsConnectDriveModalOpen(true)}
+              className="h-9 gap-1.5 text-xs rounded-xl border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400">
+              <Monitor className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Connect PC</span>
             </Button>
 
             {/* Backup Drive Button */}
@@ -940,6 +953,12 @@ export default function MyBucket() {
         defaultBucketId={params?.id}
         initialMode={driveModalMode}
         onSuccess={() => loadBucketFiles(currentPage)}
+      />
+
+      {/* Connect PC / Mac Native Drive Modal */}
+      <ConnectDriveModal
+        isOpen={isConnectDriveModalOpen}
+        onClose={() => setIsConnectDriveModalOpen(false)}
       />
 
       {/* Floating Upload Progress Dock */}

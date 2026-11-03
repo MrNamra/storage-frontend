@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Plus, UploadCloud, Download, HardDrive, RefreshCw } from 'lucide-react';
+import { Plus, UploadCloud, Download, HardDrive, RefreshCw, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StorageMetrics } from '@/components/dashboard/storage-metrics';
 import { BucketList } from '@/components/dashboard/bucket-list';
 import { DriveBackupRestoreModal } from '@/components/dashboard/DriveBackupRestoreModal';
+import { ConnectDriveModal } from '@/components/dashboard/ConnectDriveModal';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { fetchDataFromAPI } from '@/lib/api';
 import { getUser } from '@/lib/constants';
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
   const [driveModalMode, setDriveModalMode] = useState<'restore' | 'backup'>('restore');
   const [targetBucketId, setTargetBucketId] = useState<string | number | undefined>(undefined);
+  const [isConnectDriveModalOpen, setIsConnectDriveModalOpen] = useState(false);
 
   const user = JSON.parse(getUser() || 'null');
 
@@ -99,6 +101,15 @@ export default function Dashboard() {
 
             {/* Quick Drive Actions */}
             <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsConnectDriveModalOpen(true)}
+                className="h-9 gap-1.5 text-xs rounded-xl border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100/50">
+                <Monitor className="w-3.5 h-3.5" />
+                <span>Connect PC / Mac</span>
+              </Button>
+
               <Button
                 size="sm"
                 variant="outline"
@@ -184,6 +195,12 @@ export default function Dashboard() {
           defaultBucketId={targetBucketId}
           initialMode={driveModalMode}
           onSuccess={() => window.location.reload()}
+        />
+
+        {/* Connect as OS Drive Modal */}
+        <ConnectDriveModal
+          isOpen={isConnectDriveModalOpen}
+          onClose={() => setIsConnectDriveModalOpen(false)}
         />
       </DashboardLayout>
     </>
