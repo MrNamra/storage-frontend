@@ -263,7 +263,7 @@ export const BoxBoxPreviewModal: React.FC<BoxBoxPreviewModalProps> = ({
               {mediaLoading && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-10 pointer-events-none">
                   <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-2" />
-                  <span className="text-xs text-slate-300 font-medium">Streaming from Telegram...</span>
+                  <span className="text-xs text-slate-300 font-medium">Streaming from cloud...</span>
                 </div>
               )}
               <video

@@ -154,7 +154,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ) : (
             <form onSubmit={handleCreateOrUpdateShare} className="space-y-4">
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                Create a shareable link. Anyone with this link can view, stream, and download files stored in this Telegram bucket.
+                Create a shareable link. Anyone with this link can view, stream, and download files stored in this bucket.
               </p>
 
               <div>

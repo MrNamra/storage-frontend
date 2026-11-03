@@ -47,6 +47,7 @@ import { BoxBoxPreviewModal } from '@/components/dashboard/BoxBoxPreviewModal';
 import { FilePropertiesModal } from '@/components/dashboard/FilePropertiesModal';
 import { UploadProgressDock } from '@/components/dashboard/UploadProgressDock';
 import { ShareModal } from '@/components/dashboard/ShareModal';
+import { DriveBackupRestoreModal } from '@/components/dashboard/DriveBackupRestoreModal';
 import { formatBytes, getFileCategoryInfo, getPreviewType } from '@/lib/fileTypes';
 import NotFound from './NotFound';
 
@@ -71,7 +72,6 @@ export default function MyBucket() {
 
   // UI View and Filter states (BoxBox style)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
@@ -83,6 +83,8 @@ export default function MyBucket() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<any | null>(null);
+  const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
+  const [driveModalMode, setDriveModalMode] = useState<'restore' | 'backup'>('restore');
 
   // Upload state
   const [isUploading, setIsUploading] = useState(false);
@@ -158,19 +160,9 @@ export default function MyBucket() {
     loadBucketFiles(currentPage);
   }, [currentPage]);
 
-  // Filter and sort files in memory
+  // Sort files in memory
   const processedFiles = useMemo(() => {
     let result = [...files];
-
-    // Search filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter((f) => {
-        const name = (f.file_name || '').toLowerCase();
-        const type = (f.type || '').toLowerCase();
-        return name.includes(q) || type.includes(q);
-      });
-    }
 
     // Sorting
     result.sort((a, b) => {
@@ -193,7 +185,7 @@ export default function MyBucket() {
     });
 
     return result;
-  }, [files, searchQuery, sortKey, sortOrder]);
+  }, [files, sortKey, sortOrder]);
 
   // Selection handlers
   const toggleSelectFile = (msgId: string, e?: React.MouseEvent) => {
@@ -248,8 +240,8 @@ export default function MyBucket() {
       if (successCount > 0) {
         toast.success(
           successCount === 1
-            ? 'File uploaded to Telegram successfully!'
-            : `${successCount} files uploaded to Telegram successfully!`
+            ? 'File uploaded to Cloud successfully!'
+            : `${successCount} files uploaded to Cloud successfully!`
         );
         loadBucketFiles(1);
       }
@@ -315,8 +307,8 @@ export default function MyBucket() {
       );
       toast.success(
         idsToDelete.length === 1
-          ? 'File deleted from Telegram'
-          : `${idsToDelete.length} files deleted from Telegram`
+          ? 'File deleted from Cloud'
+          : `${idsToDelete.length} files deleted from Cloud`
       );
       setSelectedFileIds((prev) => prev.filter((id) => !idsToDelete.includes(id)));
       setIsDeleteConfirmOpen(false);
@@ -411,7 +403,7 @@ export default function MyBucket() {
               Drop files or folders here
             </p>
             <p className="text-xs text-blue-700 dark:text-blue-300">
-              Chunked upload directly to Telegram cloud storage
+              Resumable chunked upload directly to cloud vault
             </p>
           </div>
         )}
@@ -431,7 +423,7 @@ export default function MyBucket() {
               {bucketName || `Bucket #${params?.id}`}
             </span>
             <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
-              Telegram Cloud
+              Cloud Vault
             </span>
           </div>
 
@@ -452,23 +444,11 @@ export default function MyBucket() {
 
         {/* BoxBox Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          {/* Left: Search input */}
-          <div className="relative flex-1 min-w-[200px] max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input
-              type="text"
-              placeholder="Search files in bucket..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600">
-                ✕
-              </button>
-            )}
+          {/* Left: Files label */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Files ({processedFiles.length})
+            </span>
           </div>
 
           {/* Right: Actions, Sort, View mode */}
@@ -526,6 +506,32 @@ export default function MyBucket() {
               className="h-9 w-9 p-0 rounded-xl"
               title="Refresh Files">
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+
+            {/* Backup Drive Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setDriveModalMode('backup');
+                setIsDriveModalOpen(true);
+              }}
+              className="h-9 gap-1.5 text-xs rounded-xl border-slate-200 dark:border-slate-700">
+              <Download className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden sm:inline">Backup Drive</span>
+            </Button>
+
+            {/* Restore / Bulk Upload Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setDriveModalMode('restore');
+                setIsDriveModalOpen(true);
+              }}
+              className="h-9 gap-1.5 text-xs rounded-xl border-slate-200 dark:border-slate-700">
+              <Upload className="w-3.5 h-3.5 text-blue-600" />
+              <span className="hidden sm:inline">Restore Backup</span>
             </Button>
 
             {/* Share Bucket Button */}
@@ -645,30 +651,26 @@ export default function MyBucket() {
               <Folder className="w-10 h-10" />
             </div>
             <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1">
-              {searchQuery ? 'No matching files found' : 'This bucket is empty'}
+              This bucket is empty
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mb-4">
-              {searchQuery
-                ? `No files match "${searchQuery}". Try adjusting your search term.`
-                : 'Upload files or entire folders to store them permanently on Telegram cloud.'}
+              Upload files or entire folders to store them permanently in your cloud vault.
             </p>
-            {!searchQuery && (
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs gap-1.5">
-                  <Upload className="w-3.5 h-3.5" /> Upload Files
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => folderInputRef.current?.click()}
-                  className="text-xs gap-1.5">
-                  <FolderUp className="w-3.5 h-3.5 text-amber-500" /> Upload Folder
-                </Button>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-blue-600 hover:bg-blue-500 text-white text-xs gap-1.5">
+                <Upload className="w-3.5 h-3.5" /> Upload Files
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => folderInputRef.current?.click()}
+                className="text-xs gap-1.5">
+                <FolderUp className="w-3.5 h-3.5 text-amber-500" /> Upload Folder
+              </Button>
+            </div>
           </div>
         )}
 
@@ -931,6 +933,15 @@ export default function MyBucket() {
         token={user}
       />
 
+      {/* Drive Backup & Restore Modal */}
+      <DriveBackupRestoreModal
+        isOpen={isDriveModalOpen}
+        onClose={() => setIsDriveModalOpen(false)}
+        defaultBucketId={params?.id}
+        initialMode={driveModalMode}
+        onSuccess={() => loadBucketFiles(currentPage)}
+      />
+
       {/* Floating Upload Progress Dock */}
       <UploadProgressDock
         isUploading={isUploading}
@@ -958,14 +969,14 @@ export default function MyBucket() {
                 <h3 className="font-semibold text-slate-900 dark:text-white">Confirm Delete</h3>
                 <p className="text-xs text-slate-500">
                   {fileToDelete
-                    ? `Delete "${fileToDelete.file_name}" from Telegram cloud?`
-                    : `Delete ${selectedFileIds.length} selected files from Telegram cloud?`}
+                    ? `Delete "${fileToDelete.file_name}" from your cloud vault?`
+                    : `Delete ${selectedFileIds.length} selected files from your cloud vault?`}
                 </p>
               </div>
             </div>
 
             <p className="text-xs text-slate-600 dark:text-slate-400">
-              This action permanently deletes the messages and files from the Telegram channel. This cannot be undone.
+              This action permanently deletes the files from your cloud vault. This cannot be undone.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">

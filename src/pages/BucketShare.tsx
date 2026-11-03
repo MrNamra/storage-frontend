@@ -59,7 +59,6 @@ export default function BucketShare() {
 
   // View and filter states
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
@@ -130,18 +129,9 @@ export default function BucketShare() {
     loadSharedBucket(currentPage);
   }, [currentPage]);
 
-  // Filtered and sorted files
+  // Sorted files
   const processedFiles = useMemo(() => {
     let result = [...files];
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter((f) => {
-        const name = (f.file_name || '').toLowerCase();
-        const type = (f.type || '').toLowerCase();
-        return name.includes(q) || type.includes(q);
-      });
-    }
 
     result.sort((a, b) => {
       let comparison = 0;
@@ -163,7 +153,7 @@ export default function BucketShare() {
     });
 
     return result;
-  }, [files, searchQuery, sortKey, sortOrder]);
+  }, [files, sortKey, sortOrder]);
 
   // Selection
   const toggleSelectFile = (msgId: string, e?: React.MouseEvent) => {
@@ -338,7 +328,7 @@ export default function BucketShare() {
                 </span>
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Telegram Cloud MTProto Storage • {totalFilesCount} files ({totalStorageMB} MB)
+                Secure Cloud Storage • {totalFilesCount} files ({totalStorageMB} MB)
               </p>
             </div>
           </div>
@@ -354,16 +344,11 @@ export default function BucketShare() {
 
         {/* BoxBox Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[200px] max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input
-              type="text"
-              placeholder="Search shared files..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
-            />
+          {/* Left: Files label */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Files ({processedFiles.length})
+            </span>
           </div>
 
           {/* Right Actions */}

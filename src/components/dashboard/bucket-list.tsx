@@ -16,6 +16,8 @@ import {
   Lock,
   Globe,
   Plus,
+  UploadCloud,
+  Download,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -32,7 +34,12 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import toast from "react-hot-toast";
 
-export function BucketList() {
+interface BucketListProps {
+  onUploadToBucket?: (bucketId: string | number) => void;
+  onBackupBucket?: (bucketId: string | number) => void;
+}
+
+export function BucketList({ onUploadToBucket, onBackupBucket }: BucketListProps = {}) {
   const user = JSON.parse(getUser() || 'null');
   const navigate = useNavigate();
 
@@ -101,7 +108,7 @@ export function BucketList() {
   };
 
   const handleDeleteBucket = (id: string | number, name: string) => {
-    if (!window.confirm(`Are you sure you want to delete "${name}"? All files stored in this Telegram channel will be deleted.`)) {
+    if (!window.confirm(`Are you sure you want to delete "${name}"? All files stored in this drive will be deleted.`)) {
       return;
     }
 
@@ -205,7 +212,7 @@ export function BucketList() {
         <div className="p-8 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
           <HardDrive className="w-10 h-10 mx-auto text-slate-400 mb-2" />
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">No buckets found</p>
-          <p className="text-xs text-slate-500 mb-3">Create your first Telegram-backed storage bucket above.</p>
+          <p className="text-xs text-slate-500 mb-3">Create your first cloud storage bucket above.</p>
         </div>
       )}
 
@@ -255,6 +262,26 @@ export function BucketList() {
                       <DropdownMenuItem onClick={() => handleOpenBucket(bucket.id)} className="gap-2">
                         <Eye className="w-3.5 h-3.5 text-blue-500" /> Open Drive
                       </DropdownMenuItem>
+                      {onUploadToBucket && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUploadToBucket(bucket.id);
+                          }}
+                          className="gap-2">
+                          <UploadCloud className="w-3.5 h-3.5 text-blue-600" /> Upload / Restore
+                        </DropdownMenuItem>
+                      )}
+                      {onBackupBucket && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onBackupBucket(bucket.id);
+                          }}
+                          className="gap-2">
+                          <Download className="w-3.5 h-3.5 text-emerald-600" /> Backup Drive (ZIP)
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem
                         onClick={(e) => {
                           e.stopPropagation();
@@ -289,9 +316,23 @@ export function BucketList() {
 
                 {/* Footer Progress & Status */}
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 flex items-center gap-1.5">
-                    <Folder className="w-3.5 h-3.5 text-amber-500" /> Telegram Storage
-                  </span>
+                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    {onUploadToBucket && (
+                      <button
+                        onClick={() => onUploadToBucket(bucket.id)}
+                        className="px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 font-medium text-[11px] flex items-center gap-1">
+                        <UploadCloud className="w-3 h-3" /> Upload / Restore
+                      </button>
+                    )}
+                    {onBackupBucket && (
+                      <button
+                        onClick={() => onBackupBucket(bucket.id)}
+                        className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 font-medium text-[11px] flex items-center gap-1"
+                        title="Download ZIP Backup">
+                        <Download className="w-3 h-3" /> Backup
+                      </button>
+                    )}
+                  </div>
                   <span className="font-semibold text-blue-600 dark:text-blue-400 group-hover:underline">
                     Browse →
                   </span>
@@ -481,7 +522,7 @@ export function BucketList() {
             ) : (
               <form onSubmit={handleSaveShare} className="space-y-3">
                 <p className="text-xs text-slate-500">
-                  Generate a share link so anyone can view and stream files from this Telegram channel.
+                  Generate a share link so anyone can view and stream files from this bucket.
                 </p>
                 <div>
                   <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">

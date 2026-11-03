@@ -32,7 +32,7 @@ export const UploadProgressDock: React.FC<UploadProgressDockProps> = ({
         <div className="flex items-center gap-2.5 min-w-0">
           <UploadCloud className="w-4 h-4 text-blue-400 shrink-0 animate-pulse" />
           <span className="font-semibold text-xs sm:text-sm truncate">
-            Uploading to Telegram ({currentIndex} of {totalFiles})
+            Uploading to Cloud ({currentIndex} of {totalFiles})
           </span>
         </div>
         <div className="flex items-center gap-1 shrink-0">

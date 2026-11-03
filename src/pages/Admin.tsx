@@ -471,7 +471,7 @@ export default function Admin() {
                 <Database className="w-6 h-6" />
               </div>
             </div>
-            <p className="text-[11px] text-slate-500 mt-3">Active cloud storage channels</p>
+            <p className="text-[11px] text-slate-500 mt-3">Active cloud storage buckets</p>
           </div>
         </div>
 

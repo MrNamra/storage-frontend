@@ -106,7 +106,7 @@ export const FilePropertiesModal: React.FC<FilePropertiesModalProps> = ({
 
           <div className="flex items-center justify-between py-1 border-b border-slate-100 dark:border-slate-800/60">
             <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
-              <Key className="w-4 h-4" /> Storage ID (Telegram)
+              <Key className="w-4 h-4" /> Storage Object ID
             </span>
             <span className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate max-w-[200px]" title={String(file.msg_id || '')}>
               {String(file.msg_id || 'N/A')}
