@@ -33,7 +33,6 @@ export function Navbar() {
           <div className="hidden md:flex items-center space-x-8">
             <Link to="#features" onClick={() => document.getElementById('features')?.scrollIntoView()} className="text-gray-600 hover:text-gray-900 transition-colors">Features</Link>
             <Link to="#how-it-works" onClick={() => document.getElementById('how-it-works')?.scrollIntoView()} className="text-gray-600 hover:text-gray-900 transition-colors">How it Works</Link>
-            <Link to="#pricing" onClick={() => document.getElementById('pricing')?.scrollIntoView()} className="text-gray-600 hover:text-gray-900 transition-colors">Pricing</Link>
           </div>
 
           <div className="flex items-center space-x-2 sm:space-x-4">

@@ -1,81 +1,92 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Cloud } from 'lucide-react';
+import { Cloud, ArrowLeft, Shield, Lock, HardDrive, FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const termsData = [
   {
-    title: 'User Account',
-    content: 'By creating an account with CloudVault, you agree to provide accurate and current information. You are responsible for maintaining the confidentiality of your account credentials and all activities under your account.'
+    icon: Lock,
+    title: '1. User Account & Security',
+    content: 'By creating an account with CloudVault, you agree to provide accurate registration information. You are solely responsible for maintaining the confidentiality of your account credentials, password, and for all activities that occur under your account.'
   },
   {
-    title: 'Data Storage and Privacy',
-    content: 'CloudVault ensures the highest standards of data protection. We encrypt all stored files and guarantee that your data will not be shared with third parties without your explicit consent.'
+    icon: HardDrive,
+    title: '2. Acceptable Use',
+    content: 'CloudVault is provided for storing personal files, photos, videos, and documents. You agree not to use the service to store, transmit, or share malicious software, unauthorized copyrighted material, or any content that violates applicable local or international laws.'
   },
   {
-    title: 'Usage Restrictions',
-    content: 'Users are prohibited from storing illegal, harmful, or copyrighted content without proper authorization. CloudVault reserves the right to suspend or terminate accounts that violate these terms.'
+    icon: Shield,
+    title: '3. Data Privacy & Ownership',
+    content: 'You retain full ownership of all data and media you store in your cloud drives. Your files are private and accessible only by your account or through specific drive share links you create. We do not sell, rent, or monetize your personal files.'
   },
   {
-    title: 'Service Limitations',
-    content: 'While we strive to provide uninterrupted service, CloudVault is not liable for any data loss, service interruptions, or temporary unavailability of the platform.'
-  },
-  {
-    title: 'Subscription and Billing',
-    content: 'Subscription fees are charged monthly or annually based on your selected plan. Users can upgrade, downgrade, or cancel their subscription at any time through their account settings.'
+    icon: FileText,
+    title: '4. Service Availability & Disclaimers',
+    content: 'CloudVault is provided on an "as-is" and "as-available" basis. While we implement robust streaming and storage infrastructure, we recommend maintaining external backups for essential records. CloudVault is not liable for incidental disruptions or data loss beyond our operational control.'
   }
 ];
 
 const TermsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <motion.div 
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-12"
-        >
-          <div className="flex justify-center items-center mb-4">
-            <Cloud className="h-12 w-12 text-teal-400 mr-3" />
-            <h1 className="text-4xl font-bold text-gray-900">CloudVault Terms & Conditions</h1>
-          </div>
-          <p className="mt-4 text-xl text-gray-600">
-            Last Updated: January 2025
-          </p>
-        </motion.div>
+      <div className="max-w-3xl mx-auto">
+        {/* Navigation & Header */}
+        <div className="mb-8">
+          <Link
+            to="/"
+            className="inline-flex items-center text-sm font-medium text-purple-600 hover:text-purple-700 mb-6 transition-colors">
+            <ArrowLeft className="w-4 h-4 mr-1.5" />
+            Back to Home
+          </Link>
 
-        <div className="bg-white shadow-xl rounded-lg overflow-hidden">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="text-center">
+            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-teal-50 text-teal-600 mb-4 border border-teal-100">
+              <Cloud className="h-8 w-8 text-teal-500" />
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-bold font-poppins text-gray-900">
+              CloudVault Terms & Privacy
+            </h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Simple, transparent guidelines for using your personal cloud vault
+            </p>
+          </motion.div>
+        </div>
+
+        {/* Terms Cards */}
+        <div className="space-y-4">
           {termsData.map((term, index) => (
             <motion.div
               key={index}
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.2, duration: 0.5 }}
-              className={`p-6 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
-            >
-              <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-                {term.title}
-              </h2>
-              <p className="text-gray-600 leading-relaxed">
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1, duration: 0.4 }}
+              className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
+                  <term.icon className="w-4 h-4" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {term.title}
+                </h2>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed pl-11">
                 {term.content}
               </p>
             </motion.div>
           ))}
         </div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 1 }}
-          className="mt-12 text-center"
-        >
-          <p className="text-sm text-gray-500">
-            By using CloudVault, you acknowledge that you have read, understood, and agree to these Terms and Conditions.
+        {/* Footer info */}
+        <div className="mt-10 text-center text-xs text-gray-400 space-y-2">
+          <p>
+            By accessing or registering with CloudVault, you agree to these terms.
           </p>
-          <p className="mt-4 text-sm text-gray-400">
-            2025 CloudVault. All Rights Reserved.
-          </p>
-        </motion.div>
+          <p>© {new Date().getFullYear()} CloudVault. All rights reserved.</p>
+        </div>
       </div>
     </div>
   );
