@@ -278,9 +278,27 @@ pause
             {/* LINUX TAB */}
             {activeOS === 'linux' && (
               <div className="space-y-4 animate-in fade-in duration-100">
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-xs space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-semibold text-amber-900 dark:text-amber-200">
+                    <HelpCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>Ubuntu Red Box Error ("Location is not mountable")?</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800/90 dark:text-amber-300 leading-relaxed">
+                    Ubuntu's minimal install doesn't include the WebDAV backend by default. Run this single command in Terminal to enable it:
+                  </p>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white/80 dark:bg-slate-900 border border-amber-200/80 dark:border-amber-800/80 font-mono text-[11px] text-slate-800 dark:text-slate-200">
+                    <code>sudo apt install -y gvfs-backends && nautilus -q</code>
+                    <button
+                      onClick={() => handleCopy('sudo apt install -y gvfs-backends && nautilus -q', true)}
+                      className="text-amber-700 dark:text-amber-400 hover:underline text-[10px] ml-2 font-sans font-medium">
+                      Copy
+                    </button>
+                  </div>
+                </div>
+
                 <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
                   <p className="font-semibold text-slate-800 dark:text-slate-200">
-                    Connect via GNOME Files / Nautilus / Dolphin:
+                    Connect via GNOME Files / Nautilus:
                   </p>
                   <ol className="list-decimal list-inside space-y-1.5 pl-1 text-[12px] leading-relaxed">
                     <li>
@@ -299,12 +317,15 @@ pause
                           Copy
                         </button>
                       </div>
+                      <span className="text-[11px] text-slate-400 block pl-4">
+                        Note: Use <code>davs://</code> for HTTPS and <code>dav://</code> for HTTP. Always include the trailing slash <code>/webdav/</code>.
+                      </span>
                     </li>
                     <li>
                       Click <strong>Connect</strong>, enter your account email and password.
                     </li>
                     <li>
-                      The drive is mounted directly into your file manager. Copy, paste, and stream your media seamlessly.
+                      The drive is mounted directly into your file manager sidebar under Networks.
                     </li>
                   </ol>
                 </div>

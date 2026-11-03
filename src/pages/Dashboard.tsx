@@ -109,7 +109,7 @@ export default function Dashboard() {
                 <Monitor className="w-3.5 h-3.5" />
                 <span>Connect PC / Mac</span>
               </Button>
-
+{/* 
               <Button
                 size="sm"
                 variant="outline"
@@ -126,7 +126,7 @@ export default function Dashboard() {
                 className="h-9 gap-1.5 text-xs rounded-xl border-slate-200 dark:border-slate-700">
                 <UploadCloud className="w-3.5 h-3.5 text-blue-600" />
                 <span>Upload & Restore</span>
-              </Button>
+              </Button> */}
 
               <Button
                 size="sm"
