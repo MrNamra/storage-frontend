@@ -243,16 +243,10 @@ export default function SignUp() {
                 I agree to the{" "}
                 <Link
                   to="/terms-conditions"
-                  className="font-medium text-purple-600 hover:text-purple-500"
+                  className="font-medium text-purple-600 hover:text-purple-500 underline"
+                  target="_blank"
                 >
-                  Terms of Service
-                </Link>{" "}
-                and{" "}
-                <Link
-                  to="/privacy"
-                  className="font-medium text-purple-600 hover:text-purple-500"
-                >
-                  Privacy Policy
+                  Terms of Service & Privacy
                 </Link>
               </label>
             </div>
