@@ -1,71 +1,99 @@
-import {Plus, Download, Upload, File, LayoutGrid, List, Film, Music} from 'lucide-react';
-import {Button} from '@/components/ui/button';
-// import {StorageMetrics} from '@/components/dashboard/storage-metrics';
-// import {BucketList} from '@/components/dashboard/bucket-list';
-// import {FileUploader} from '@/components/dashboard/file-uploader';
-import toast, { Toaster } from "react-hot-toast";
-import DashboardLayout from '@/components/layout/DashboardLayout';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {useEffect, useState, useRef} from 'react';
-import {fetchDataFromAPI} from '@/lib/api';
-import {getUser} from '@/lib/constants';
-import {useParams} from 'react-router-dom';
-import moment from 'moment';
-import {MoreVertical, Trash2} from 'lucide-react';
-import {motion} from 'framer-motion';
-import {bulkDownloadFiles, BulkProgress, parseFilenameFromHeaders} from '@/lib/bulkDownload';
-import {uploadFileChunked} from '@/lib/chunkedUpload';
-import {Progress} from '@/components/ui/progress';
-import NotFound from './NotFound';
-
+  Folder,
+  FolderPlus,
+  FolderUp,
+  Upload,
+  Download,
+  Share2,
+  Trash2,
+  Search,
+  LayoutGrid,
+  List,
+  RefreshCw,
+  MoreVertical,
+  CheckSquare,
+  Square,
+  HardDrive,
+  Info,
+  ChevronRight,
+  ArrowUpDown,
+  Filter,
+  Eye,
+  Copy,
+  Check,
+  AlertTriangle,
+  Cloud,
+  FileCode,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import toast from 'react-hot-toast';
+import DashboardLayout from '@/components/layout/DashboardLayout';
+import { fetchDataFromAPI } from '@/lib/api';
+import { getUser } from '@/lib/constants';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import moment from 'moment';
+import { bulkDownloadFiles, BulkProgress } from '@/lib/bulkDownload';
+import { uploadFileChunked } from '@/lib/chunkedUpload';
+import { BoxBoxPreviewModal } from '@/components/dashboard/BoxBoxPreviewModal';
+import { FilePropertiesModal } from '@/components/dashboard/FilePropertiesModal';
+import { UploadProgressDock } from '@/components/dashboard/UploadProgressDock';
+import { ShareModal } from '@/components/dashboard/ShareModal';
+import { formatBytes, getFileCategoryInfo, getPreviewType } from '@/lib/fileTypes';
+import NotFound from './NotFound';
+
+type SortKey = 'name' | 'size' | 'date' | 'type';
+type SortOrder = 'asc' | 'desc';
 
 export default function MyBucket() {
   const params = useParams();
-  const user = JSON.parse(getUser());
+  const navigate = useNavigate();
+  const user = JSON.parse(getUser() || 'null');
 
-  // const [isModalOpen, setIsModalOpen] = useState(false);
-  // const [isDeleteEnable, setIsDeleteEnable] = useState(false);
-  const [bucketName, setBucketName] = useState('');
-  // const [error, setError] = useState('');
-  const [bucket, setBucket] = useState([]);
-  const [loading, setLoading] = useState(false); // State for loading
+  // Bucket and Files state
+  const [bucketName, setBucketName] = useState<string>('');
+  const [shareCode, setShareCode] = useState<string | null>(null);
+  const [files, setFiles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [totalFilesCount, setTotalFilesCount] = useState(0);
+  const [totalStorageMB, setTotalStorageMB] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [notFound, setNotFound] = useState(false);
-  // const [password, setPassword] = useState('');
 
-  const [fileId, setFileID] = useState();
-  const [showPreView, setShowPreView] = useState(false);
-  const [mediaLoading, setMediaLoading] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [selectedFiles, setSelectedFiles] = useState([]);
+  // UI View and Filter states (BoxBox style)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  const cleanupVideo = () => {
-    if (videoRef.current) {
-      try {
-        videoRef.current.pause();
-        videoRef.current.removeAttribute('src');
-        videoRef.current.load();
-      } catch (err) {
-        console.warn('Error resetting video element:', err);
-      }
-    }
-  };
-  const [checkedFiles, setCheckedFiles] = useState([]);
-  const [showConfirm, setShowConfirm] = useState(false);
+  // Modals state
+  const [activePreviewFile, setActivePreviewFile] = useState<any | null>(null);
+  const [propertiesFile, setPropertiesFile] = useState<any | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<any | null>(null);
+
+  // Upload state
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatusText, setUploadStatusText] = useState('');
+  const [uploadCurrentFileName, setUploadCurrentFileName] = useState('');
+  const [uploadCurrentIndex, setUploadCurrentIndex] = useState(0);
+  const [uploadTotalCount, setUploadTotalCount] = useState(0);
+  const [uploadAbortController, setUploadAbortController] = useState<AbortController | null>(null);
+
+  // Bulk ZIP Download state
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<BulkProgress>({
     current: 0,
@@ -74,156 +102,138 @@ export default function MyBucket() {
     currentFileName: '',
     stage: 'downloading',
   });
-  const [bulkAbortController, setBulkAbortController] = useState<AbortController | null>(null);
 
-  const [totlaFile, setTotalFile] = useState(0);
-  // const [totlaStorage, setStorage] = useState(0);
-  // const [showUploader, setShowUploader] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadStatusText, setUploadStatusText] = useState('');
-  const [uploadCurrentFile, setUploadCurrentFile] = useState('');
-  const [uploadCurrentFileIndex, setUploadCurrentFileIndex] = useState(0);
-  const [uploadAbortController, setUploadAbortController] = useState<AbortController | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  const handleSort = () => {
-    const nextDir = sortDirection === 'asc' ? 'desc' : 'asc';
-    setSortDirection(nextDir);
-    setBucket((prev: any[]) =>
-      [...prev].sort((a: any, b: any) => {
-        const valA = (a.file_name || '').toLowerCase();
-        const valB = (b.file_name || '').toLowerCase();
-        return nextDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-      })
-    );
-  };
-
-  const formatSize = (bytes?: number) => {
-    if (!bytes || bytes <= 0) return '';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-  };
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        handleCloseModal();
-      }
-    };
-    if (showPreView) {
-      window.addEventListener('keydown', handleKeyDown);
-    } else {
-      cleanupVideo();
-      setMediaLoading(false);
-    }
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showPreView]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-    setNotFound(false);
-  }, [params?.id]);
-
-  useEffect(() => {
-    if (params?.id) {
-      mybucket(currentPage);
-    }
-  }, [params?.id, currentPage]);
-
-  useEffect(() => {
-    setCheckedFiles([]);
-  }, [bucket]);
-
-  const mybucket = (page = currentPage) => {
+  // Load Bucket info & files
+  const loadBucketFiles = (page = currentPage) => {
+    if (!params?.id) return;
     setLoading(true);
-    fetchDataFromAPI(
-      `bucket/display/${params?.id}?page=${page ?? 1}&limit=15`,
-      'get',
-      '',
-      user,
-    )
+    fetchDataFromAPI<any>(`bucket/display/${params.id}?page=${page}&limit=50`, 'get', '', user)
       .then((res) => {
-        const files = Array.isArray(res?.data) ? res.data : (res?.data?.files || []);
+        const fileList = Array.isArray(res?.data) ? res.data : res?.data?.files || [];
         const pagination = res?.pagination || res?.data?.pagination;
-        const total = pagination?.totalFiles ?? files.length;
-        const pages = pagination?.totalPages ?? Math.max(1, Math.ceil(total / 15));
+        const total = pagination?.totalFiles ?? fileList.length;
+        const pages = pagination?.totalPages ?? Math.max(1, Math.ceil(total / 50));
 
-        setBucket(files);
-        setTotalFile(total);
-        // setStorage(res?.totalStorage ?? res?.data?.totalStorage ?? 0);
+        setFiles(fileList);
+        setTotalFilesCount(total);
+        setTotalStorageMB(res?.totalStorage ?? res?.data?.totalStorage ?? 0);
         setTotalPages(pages);
-        if (currentPage > pages && pages >= 1) {
-          setCurrentPage(pages);
-        }
         setLoading(false);
       })
       .catch((error) => {
-        console.log('error', error);
-        const status = error?.response?.status || error?.status;
-        if (status === 404 || error?.message?.includes('404')) {
+        console.error('Error loading bucket files:', error);
+        if (error?.response?.status === 404 || error?.status === 404) {
           setNotFound(true);
         }
         setLoading(false);
       });
   };
 
-  // const handleOpenModal = () => {
-  //   setShowPreView(true);
-  // };
-
-  const handleCloseModal = () => {
-    cleanupVideo();
-    setShowPreView(false);
-    setMediaLoading(false);
-    setLoading(false);
+  // Fetch bucket metadata (name, share code)
+  const loadBucketMeta = () => {
+    if (!params?.id) return;
+    fetchDataFromAPI<any>('bucket/list', 'get', '', user)
+      .then((res) => {
+        const buckets = res?.buckets || res?.data || [];
+        const current = buckets.find((b: any) => String(b.id) === String(params.id));
+        if (current) {
+          setBucketName(current.bucketName || `Bucket #${current.id}`);
+          setShareCode(current.code || null);
+        }
+      })
+      .catch((err) => console.warn('Could not load bucket meta:', err));
   };
 
-  // const handleOpenModalUpload = () => {
-  //   setShowUploader(true);
-  // };
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedFileIds([]);
+    loadBucketMeta();
+    loadBucketFiles(1);
+  }, [params?.id]);
 
-  // const handleCloseModalUpload = () => {
-  //   setShowUploader(false);
-  // };
+  useEffect(() => {
+    loadBucketFiles(currentPage);
+  }, [currentPage]);
 
-  const handleCancelUpload = () => {
-    if (uploadAbortController) {
-      uploadAbortController.abort();
-      setUploadAbortController(null);
-      setIsUploading(false);
-      setUploadStatusText('Upload cancelled');
-      toast('Upload cancelled');
+  // Filter and sort files in memory
+  const processedFiles = useMemo(() => {
+    let result = [...files];
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter((f) => {
+        const name = (f.file_name || '').toLowerCase();
+        const type = (f.type || '').toLowerCase();
+        return name.includes(q) || type.includes(q);
+      });
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortKey) {
+        case 'name':
+          comparison = (a.file_name || '').localeCompare(b.file_name || '');
+          break;
+        case 'size':
+          comparison = (a.size || 0) - (b.size || 0);
+          break;
+        case 'date':
+          comparison = (a.date || 0) - (b.date || 0);
+          break;
+        case 'type':
+          comparison = getPreviewType(a.file_name).localeCompare(getPreviewType(b.file_name));
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [files, searchQuery, sortKey, sortOrder]);
+
+  // Selection handlers
+  const toggleSelectFile = (msgId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedFileIds((prev) =>
+      prev.includes(msgId) ? prev.filter((id) => id !== msgId) : [...prev, msgId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedFileIds.length === processedFiles.length) {
+      setSelectedFileIds([]);
+    } else {
+      setSelectedFileIds(processedFiles.map((f) => String(f.msg_id)));
     }
   };
 
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    if (!selectedFiles?.length) return;
+  // Upload handler for files or entire folders
+  const handleFilesUpload = async (fileList: FileList | File[]) => {
+    if (!fileList || fileList.length === 0 || !params?.id) return;
+    const uploadArray = Array.from(fileList);
 
     const controller = new AbortController();
     setUploadAbortController(controller);
     setIsUploading(true);
     setUploadProgress(0);
+    setUploadTotalCount(uploadArray.length);
 
-    const totalToUpload = selectedFiles.length;
     let successCount = 0;
-
     try {
-      for (let i = 0; i < totalToUpload; i++) {
+      for (let i = 0; i < uploadArray.length; i++) {
         if (controller.signal.aborted) break;
 
-        const file = selectedFiles[i];
-        setUploadCurrentFile(file.name);
-        setUploadCurrentFileIndex(i + 1);
+        const currentFile = uploadArray[i];
+        setUploadCurrentFileName(currentFile.name);
+        setUploadCurrentIndex(i + 1);
 
         await uploadFileChunked({
-          file,
-          bucketId: params?.id,
+          file: currentFile,
+          bucketId: params.id,
           token: user,
           signal: controller.signal,
           onProgress: (p) => {
@@ -238,1091 +248,745 @@ export default function MyBucket() {
       if (successCount > 0) {
         toast.success(
           successCount === 1
-            ? 'File uploaded successfully!'
-            : `${successCount} files uploaded successfully!`
+            ? 'File uploaded to Telegram successfully!'
+            : `${successCount} files uploaded to Telegram successfully!`
         );
-        setSelectedFiles([]);
-        mybucket(1);
+        loadBucketFiles(1);
       }
-    } catch (error: any) {
+    } catch (err: any) {
       if (!controller.signal.aborted) {
-        console.error('Upload error:', error);
-        toast.error(error?.message || 'Upload failed');
+        console.error('Upload error:', err);
+        toast.error(err?.message || 'Failed to complete upload');
       }
     } finally {
       setIsUploading(false);
       setUploadAbortController(null);
-      setUploadCurrentFile('');
-      setUploadProgress(0);
-      setUploadStatusText('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (folderInputRef.current) folderInputRef.current.value = '';
     }
   };
 
-  const handleDeleteBtn = () => {
-
-  }
-
-  // Handle page change
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= (totalPages || 1)) {
-      setCurrentPage(page);
+  const handleCancelUpload = () => {
+    if (uploadAbortController) {
+      uploadAbortController.abort();
+      setUploadAbortController(null);
+      setIsUploading(false);
+      toast('Upload cancelled');
     }
   };
 
-  const renderPagination = () => {
-    if (!totalPages || totalPages <= 1) {
-      return (
-        <button
-          key={1}
-          className="px-3.5 py-1.5 border rounded-lg mx-0.5 text-sm bg-purple-600 text-white border-purple-600 shadow-sm font-semibold">
-          1
-        </button>
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      handleFilesUpload(e.dataTransfer.files);
+    }
+  };
+
+  // Delete Handler
+  const handleDeleteSelected = async () => {
+    const idsToDelete = fileToDelete
+      ? [fileToDelete.msg_id]
+      : selectedFileIds;
+
+    if (!idsToDelete || idsToDelete.length === 0 || !params?.id) return;
+
+    try {
+      setLoading(true);
+      await fetchDataFromAPI(
+        `bucket/${params.id}/delete-file`,
+        'post',
+        { file_id: idsToDelete },
+        user
       );
-    }
-    const pages = [];
-    const maxVisible = 5;
-    let startPage = Math.max(1, currentPage - 2);
-    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-
-    if (endPage - startPage < maxVisible - 1) {
-      startPage = Math.max(1, endPage - maxVisible + 1);
-    }
-
-    if (startPage > 1) {
-      pages.push(
-        <button
-          key={1}
-          onClick={() => handlePageChange(1)}
-          className={`px-3.5 py-1.5 border rounded-lg mx-0.5 text-sm transition-colors ${
-            currentPage === 1
-              ? 'bg-purple-600 text-white border-purple-600 shadow-sm font-semibold'
-              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700'
-          }`}>
-          1
-        </button>
+      toast.success(
+        idsToDelete.length === 1
+          ? 'File deleted from Telegram'
+          : `${idsToDelete.length} files deleted from Telegram`
       );
-      if (startPage > 2) {
-        pages.push(
-          <span key="dots-start" className="px-1 text-gray-400">...</span>
-        );
-      }
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(
-        <button
-          key={i}
-          onClick={() => handlePageChange(i)}
-          className={`px-3.5 py-1.5 border rounded-lg mx-0.5 text-sm transition-colors ${
-            currentPage === i
-              ? 'bg-purple-600 text-white border-purple-600 shadow-sm font-semibold'
-              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700'
-          }`}>
-          {i}
-        </button>,
-      );
-    }
-
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        pages.push(
-          <span key="dots-end" className="px-1 text-gray-400">...</span>
-        );
-      }
-      pages.push(
-        <button
-          key={totalPages}
-          onClick={() => handlePageChange(totalPages)}
-          className={`px-3.5 py-1.5 border rounded-lg mx-0.5 text-sm transition-colors ${
-            currentPage === totalPages
-              ? 'bg-purple-600 text-white border-purple-600 shadow-sm font-semibold'
-              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700'
-          }`}>
-          {totalPages}
-        </button>
-      );
-    }
-
-    return pages;
-  };
-
-  const preView = (index) => {
-    cleanupVideo();
-    setShowPreView(true);
-    setFileID(index);
-    setMediaLoading(true);
-  };
-
-  const [currentIndex, setCurrentIndex] = useState(fileId || 0); // Track the current file index
-
-  useEffect(() => {
-    setCurrentIndex(fileId);
-  }, [fileId]);
-  // Get the current file object
-  const currentFile = bucket[currentIndex];
-
-  const fileType = currentFile?.mime_type; // "image/png"
-  const valueAfterSlash = fileType?.split('/')[1];
-
-  console.log('object: ', valueAfterSlash);
-
-  const handlePreviousImage = () => {
-    cleanupVideo();
-    setCurrentIndex((prevIndex) => Math.max(0, prevIndex - 1)); // Prevent going below index 0
-    setMediaLoading(true);
-  };
-
-  const handleNextImage = () => {
-    cleanupVideo();
-    setCurrentIndex((prevIndex) => Math.min(bucket?.length - 1, prevIndex + 1)); // Prevent exceeding array bounds
-    setMediaLoading(true);
-  };
-
-  const toggleCheckbox = (fileId) => {
-    setCheckedFiles((prev) =>
-      prev.includes(fileId)
-        ? prev.filter((id) => id !== fileId)
-        : [...prev, fileId]
-    );
-  };
-
-  const toggleSelectAll = () => {
-    if (!bucket || bucket.length === 0) return;
-    if (checkedFiles.length === bucket.length) {
-      setCheckedFiles([]);
-    } else {
-      setCheckedFiles(bucket.map((f: any) => f.msg_id));
+      setSelectedFileIds((prev) => prev.filter((id) => !idsToDelete.includes(id)));
+      setIsDeleteConfirmOpen(false);
+      setFileToDelete(null);
+      loadBucketFiles(currentPage);
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      toast.error(err?.response?.data?.message || 'Failed to delete file(s)');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleBulkDownload = async (filesToDownload?: any[]) => {
-    const targetFiles = filesToDownload || bucket.filter((f: any) => checkedFiles.includes(f.msg_id));
-    if (!targetFiles || targetFiles.length === 0) {
-      toast.error('No files selected to download');
+  // Bulk ZIP Download Handler
+  const handleBulkDownload = async () => {
+    const filesToDownload = selectedFileIds.length > 0
+      ? processedFiles.filter((f) => selectedFileIds.includes(String(f.msg_id)))
+      : processedFiles;
+
+    if (filesToDownload.length === 0) {
+      toast.error('No files available to download');
       return;
     }
 
-    const controller = new AbortController();
-    setBulkAbortController(controller);
     setBulkDownloading(true);
+    const controller = new AbortController();
 
     try {
       await bulkDownloadFiles({
-        files: targetFiles,
-        fetchFileBlob: async (file: any, signal?: AbortSignal) => {
+        files: filesToDownload,
+        zipFilename: `${bucketName || 'bucket'}-archive.zip`,
+        signal: controller.signal,
+        onProgress: (p) => setBulkProgress(p),
+        fetchFileBlob: async (item, signal) => {
+          const downloadEndpoint = item.stream_url
+            ? `${item.stream_url}?dl=1`
+            : `/api/bucket/file/download/${params?.id}/${item.msg_id}`;
+
           const res: any = await fetchDataFromAPI(
-            'bucket/file/download',
-            'post',
-            {
-              file_id: file.msg_id,
-              bucket_id: params?.id,
-            },
+            downloadEndpoint.replace(/^\/api\//, ''),
+            'get',
+            '',
             user,
             undefined,
             'blob'
           );
-          const filename = parseFilenameFromHeaders(res.headers, file.file_name || `file_${file.msg_id}`);
-          return { blob: res.data, filename };
+
+          return {
+            blob: res.data instanceof Blob ? res.data : new Blob([res.data]),
+            filename: item.file_name || `file_${item.msg_id}`,
+          };
         },
-        zipFilename: `cloudvault-${bucketName || 'bucket'}-files.zip`,
-        onProgress: (p) => setBulkProgress(p),
-        signal: controller.signal,
       });
 
-      toast.success(
-        targetFiles.length === 1
-          ? 'File downloaded successfully!'
-          : `Successfully downloaded ${targetFiles.length} files!`
-      );
+      toast.success('ZIP archive generated and downloaded!');
     } catch (err: any) {
-      if (err?.name === 'AbortError') {
-        toast('Download canceled');
-      } else {
-        console.error('Bulk download error:', err);
-        toast.error('Failed to download files');
-      }
+      console.error('Bulk download error:', err);
+      toast.error('Failed to download files archive');
     } finally {
       setBulkDownloading(false);
-      setBulkAbortController(null);
     }
   };
 
-  const handleCancelBulkDownload = () => {
-    if (bulkAbortController) {
-      bulkAbortController.abort();
+  const copyDirectLink = (file: any, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const link = file.stream_url ? `${window.location.origin}${file.stream_url}` : '';
+    if (link) {
+      navigator.clipboard.writeText(link);
+      toast.success('Stream link copied to clipboard!');
     }
-    setBulkDownloading(false);
-    setBulkAbortController(null);
   };
-  const handleBulkDelete = () => {
-    fetchDataFromAPI(`bucket/${params?.id}/delete-file`, 'post', { file_id: checkedFiles }, user)
-      .then((res) => {
-        // console.log('res', res);
-        toast.success(res?.message)
-        mybucket();
-        setCheckedFiles([])
-        setLoading(false);
-      })
-      .catch((error) => {
-        setLoading(false);
-        toast.error(res?.message)
-
-        console.log('error', error);
-      });
-  }
-  const handleDelete = (id) => {
-    console.log('id', id);
-    setLoading(true);
-    fetchDataFromAPI(`bucket/${params?.id}/delete-file`, 'post', { file_id: [id] }, user)
-      .then((res) => {
-        // console.log('res', res);
-        toast.success(res?.message)
-        mybucket();
-        setLoading(false);
-      })
-      .catch((error) => {
-        setLoading(false);
-        toast.error(error?.response?.data?.message || error?.message || 'Action failed');
-        console.log('error', error);
-      });
-  };
-  // Check if file is streamable (video, PDF, or image)
-  const isStreamable = (file: any): boolean => {
-    if (!file) return false;
-    const mimeType = file.mime_type || '';
-    const fileType = file.type || '';
-    const fileName = (file.file_name || '').toLowerCase();
-    
-    // Check for images
-    if (mimeType.startsWith('image/') || fileType === 'photo' || /\.(heic|heif|jpg|jpeg|png|gif|webp)$/i.test(fileName)) {
-      return true;
-    }
-    
-    // Check for videos
-    if (mimeType.startsWith('video/') || fileType === 'video' || /\.(mov|mp4|m4v|mkv|webm|avi|3gp|flv|wmv)$/i.test(fileName)) {
-      return true;
-    }
-    
-    // Check for PDFs
-    if (mimeType === 'application/pdf' || fileName.endsWith('.pdf')) {
-      return true;
-    }
-    
-    return false;
-  };
-
-
-  const handleDownload = (fileId: string, fileName?: string, file?: any) => {
-    // Use the file's signed stream URL directly with ?dl=1 to force attachment disposition.
-    // This avoids loading the entire file into JS memory (which caused the full-page loader).
-    const streamUrl = file?.stream_url;
-    if (streamUrl) {
-      const downloadUrl = `${streamUrl}?dl=1`;
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = fileName || file?.file_name || 'download';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(() => {
-        try { document.body.removeChild(link); } catch (_) {}
-      }, 1000);
-      toast.success('Download started');
-      return;
-    }
-
-    // Fallback: legacy blob-based download (used if stream_url is unavailable)
-    setLoading(true);
-    fetchDataFromAPI(
-      'bucket/file/download',
-      'post',
-      { file_id: fileId, bucket_id: params?.id },
-      user,
-      undefined,
-      'blob'
-    ).then((response: any) => {
-      const blob = response.data;
-      const headers = response.headers || {};
-      let filename = fileName || 'download';
-      if (!fileName) {
-        const cd = headers['content-disposition'] || headers['Content-Disposition'];
-        if (cd) {
-          const m = cd.match(/filename\*=UTF-8''([^;\n]*)/i);
-          if (m?.[1]) { try { filename = decodeURIComponent(m[1].trim()); } catch (_) {} }
-          else {
-            const m2 = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i);
-            if (m2?.[1]) { try { filename = decodeURIComponent(m2[1].replace(/^['"]|['"]$/g, '').trim()); } catch (_) {} }
-          }
-        }
-      }
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url; link.download = filename;
-      document.body.appendChild(link); link.click();
-      setTimeout(() => {
-        try { if (link.parentNode) document.body.removeChild(link); window.URL.revokeObjectURL(url); } catch (_) {}
-      }, 3000);
-      toast.success('File downloaded successfully');
-    }).catch((error: any) => {
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to download file');
-    }).finally(() => setLoading(false));
-  };
-
-  const handleFileChange = (event) => {
-    const files = Array.from(event.target.files); // Convert FileList to array
-    setSelectedFiles((prevFiles) => [...prevFiles, ...files]);
-  };
-
-  // const formatStorageSize = (sizeInMB) => {
-  //   if (sizeInMB >= 1024) {
-  //     // Convert MB to GB if size is 1024 MB or more
-  //     return `${(sizeInMB / 1024)?.toFixed(2)} GB`;
-  //   }
-  //   // Otherwise, show it in MB
-  //   return `${sizeInMB?.toFixed(2)} MB`;
-  // };
 
   if (notFound) {
-    return (
-      <DashboardLayout>
-        <NotFound
-          title="Bucket Not Found"
-          message="The bucket you are looking for does not exist, has been deleted, or you do not have permission to access it."
-          statusCode="404"
-        />
-      </DashboardLayout>
-    );
+    return <NotFound />;
   }
 
   return (
-    <>
-      
-      {loading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <span className="loader h-8 w-8 border-4 border-t-purple-500 border-white rounded-full animate-spin"></span>
-        </div>
-      )}
-     
-
-      <DashboardLayout>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* <motion.div
-            initial={{opacity: 0, y: 20}}
-            animate={{opacity: 1, y: 0}}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 flex items-center space-x-4">
-            <HardDrive className="h-8 w-8 text-teal-400" />
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Storage Used
-                </p>
-                <h3 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
-                  {formatStorageSize(totlaStorage)}
-                </h3>
-              </div>
+    <DashboardLayout>
+      <div
+        className="relative space-y-6 min-h-[85vh] select-none"
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}>
+        
+        {/* BoxBox Drag & Drop Overlay */}
+        {isDragOver && (
+          <div className="absolute inset-0 z-40 bg-blue-600/10 dark:bg-blue-600/20 backdrop-blur-sm border-2 border-dashed border-blue-500 rounded-2xl flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-150">
+            <div className="p-4 rounded-full bg-blue-600 text-white shadow-xl mb-3">
+              <Upload className="w-8 h-8 animate-bounce" />
             </div>
-            <div className="mt-4">
-              <Progress value={totlaStorage?.toFixed(2)} className="h-2" />
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                {formatStorageSize(totlaStorage)} of total storage
-              </p>
-            </div>
-          </motion.div> */}
-
-          <motion.div
-            initial={{opacity: 0, y: 20}}
-            animate={{opacity: 1, y: 0}}
-            transition={{delay: 0.1}}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 flex items-center space-x-4">
-            <File className="h-8 w-8 text-purple-600" />
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Files
-                </p>
-                <h3 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
-                  {totlaFile}
-                </h3>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{opacity: 0, y: 20}}
-            animate={{opacity: 1, y: 0}}
-            transition={{delay: 0.2}}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 max-w-md mx-auto space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-              Upload Your Files
-            </h2>
-
-            {/* Drag and Drop Zone */}
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 bg-gray-50 dark:bg-gray-700 flex items-center justify-center text-center">
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-                <div>
-                  <Upload className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500" />
-                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    Drag & drop your files here, or{' '}
-                    <span className="text-blue-500 underline">browse</span>
-                  </p>
-                </div>
-              </label>
-            </div>
-
-            {/* Selected Files */}
-            {selectedFiles.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-gray-600 dark:text-gray-400 font-medium">
-                  Selected Files:
-                </h3>
-                <ul className="space-y-1">
-                  {selectedFiles.map((file, index) => (
-                    <li
-                      key={index}
-                      className="bg-gray-100 dark:bg-gray-700 rounded-md px-4 py-2 text-sm text-gray-800 dark:text-white flex justify-between">
-                      <span>{file.name}</span>
-                      <span className="text-gray-500 text-xs">
-                        {(file.size / 1024).toFixed(2)} KB
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            
-            {isUploading && (
-              <div className="mt-4 p-4 rounded-xl bg-purple-50 dark:bg-gray-700/70 border border-purple-200 dark:border-gray-600 space-y-2.5">
-                <div className="flex items-center justify-between text-xs font-semibold text-purple-700 dark:text-purple-300">
-                  <span className="truncate max-w-[220px]" title={uploadCurrentFile}>
-                    File {uploadCurrentFileIndex} of {selectedFiles.length}: {uploadCurrentFile}
-                  </span>
-                  <span className="tabular-nums font-mono font-bold">{uploadProgress}%</span>
-                </div>
-                <Progress value={uploadProgress} className="h-2.5 bg-purple-100 dark:bg-gray-600" />
-                <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300">
-                  <span className="truncate pr-2">{uploadStatusText || 'Uploading...'}</span>
-                  <button
-                    type="button"
-                    onClick={handleCancelUpload}
-                    className="text-red-500 hover:text-red-700 font-semibold shrink-0 ml-2 hover:underline">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Upload Button */}
-            <button
-              disabled={selectedFiles?.length === 0 || isUploading}
-              className={`w-full ${
-                selectedFiles?.length === 0 || isUploading
-                  ? 'bg-purple-300 dark:bg-purple-900/40 cursor-not-allowed text-white/80'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white shadow-md'
-              } font-medium py-3 rounded-lg flex items-center justify-center space-x-2 transition duration-200`}
-              onClick={(e) => handleSubmit(e)}>
-              {isUploading ? (
-                <>
-                  <span className="loader h-4 w-4 border-2 border-t-transparent border-white rounded-full animate-spin"></span>
-                  <span>Uploading ({uploadProgress}%)...</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="h-5 w-5" />
-                  <span>Upload {selectedFiles.length > 0 ? `(${selectedFiles.length}) File${selectedFiles.length > 1 ? 's' : ''}` : 'Files'}</span>
-                </>
-              )}
-            </button>
-          </motion.div>
-        </div>
-
-        <div className="space-y-6 mt-8">
-          {/* Action Toolbar */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700/60 p-3 sm:p-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center flex-wrap gap-2 sm:gap-3">
-                <label className="flex items-center space-x-2 cursor-pointer select-none text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">
-                  <input
-                    type="checkbox"
-                    checked={bucket?.length > 0 && checkedFiles.length === bucket?.length}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
-                    title={checkedFiles.length === bucket?.length ? "Deselect All" : "Select All"}
-                  />
-                  <span className="text-xs sm:text-sm">
-                    {checkedFiles.length > 0 ? `${checkedFiles.length} selected` : 'Select All'}
-                  </span>
-                </label>
-
-                {checkedFiles.length > 0 ? (
-                  <>
-                    <Button
-                      size="sm"
-                      className="bg-purple-600 hover:bg-purple-700 text-white flex items-center space-x-1.5 h-8 px-3 text-xs shadow-sm"
-                      onClick={() => handleBulkDownload()}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Download ({checkedFiles.length})</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => setShowConfirm(true)}
-                      className="h-8 px-3 text-xs flex items-center space-x-1 shadow-sm"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span>Delete ({checkedFiles.length})</span>
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSort('name')}
-                      className="flex items-center space-x-1.5 h-8 px-2.5 text-xs text-gray-600 dark:text-gray-300 hover:text-purple-600">
-                      <span>Sort by name</span>
-                    </Button>
-                    {bucket?.length > 0 && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleBulkDownload(bucket)}
-                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 h-8 px-2.5 text-xs flex items-center space-x-1.5"
-                        title="Download all files in this bucket"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        <span>Download All ({bucket.length})</span>
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* View Switcher: Cards vs List */}
-              <div className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700/60 p-1 rounded-lg self-end sm:self-auto">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded-md text-xs font-medium flex items-center space-x-1.5 transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                  }`}
-                  title="Cards view"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                  <span className="text-xs">Cards</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded-md text-xs font-medium flex items-center space-x-1.5 transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                  }`}
-                  title="List view"
-                >
-                  <List className="h-4 w-4" />
-                  <span className="text-xs">List</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Files display */}
-          {!bucket || bucket.length === 0 ? (
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-12 text-center text-gray-500 dark:text-gray-400">
-              <File className="mx-auto h-12 w-12 text-gray-400 mb-3 opacity-60" />
-              <p className="font-medium text-base text-gray-700 dark:text-gray-300">No files found</p>
-              <p className="text-xs mt-1 text-gray-400">Upload files above to store and view them in this bucket.</p>
-            </div>
-          ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-              {bucket.map((file: any, index: number) => {
-                const isSelected = checkedFiles.includes(file.msg_id);
-                return (
-                  <div
-                    key={file?.msg_id || index}
-                    onClick={() => preView(index)}
-                    className={`group relative bg-white dark:bg-gray-800 rounded-xl border transition-all duration-200 overflow-hidden cursor-pointer flex flex-col shadow-sm hover:shadow-md ${
-                      isSelected
-                        ? 'border-purple-600 ring-2 ring-purple-600/30 dark:border-purple-400 bg-purple-50/10'
-                        : 'border-gray-200 dark:border-gray-700/80 hover:border-purple-300 dark:hover:border-purple-500/60'
-                    }`}
-                  >
-                    {/* Thumbnail preview */}
-                    <div className="relative aspect-square w-full bg-gray-100 dark:bg-gray-900/60 overflow-hidden flex items-center justify-center">
-                      <img
-                        src={file.thumbnail}
-                        alt={file.file_name || 'Thumbnail'}
-                        loading="lazy"
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src =
-                            'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
-                        }}
-                      />
-
-                      {/* Floating Checkbox (top-left) */}
-                      <div
-                        className="absolute top-2 left-2 z-10 p-1 rounded-md bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleCheckbox(file.msg_id)}
-                          className="w-4 h-4 accent-purple-600 cursor-pointer block rounded"
-                        />
-                      </div>
-
-                      {/* Dropdown Menu (top-right) */}
-                      <div
-                        className="absolute top-2 right-2 z-10"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 rounded-md bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleDownload(file?.msg_id, file?.file_name, file)}
-                              className="text-blue-600 dark:text-blue-400"
-                            >
-                              <Download className="h-4 w-4 mr-2" />
-                              Download
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(file?.msg_id)}
-                              className="text-red-600 dark:text-red-400"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-
-                      {/* Type badge */}
-                      {(file.type === 'video' || file.mime_type?.startsWith('video/')) && (
-                        <span className="absolute bottom-2 left-2 z-10 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-black/70 text-white backdrop-blur-sm flex items-center gap-1 shadow-sm">
-                          <Film className="w-3 h-3" /> Video
-                        </span>
-                      )}
-                      {(file.type === 'audio' || file.mime_type?.startsWith('audio/')) && (
-                        <span className="absolute bottom-2 left-2 z-10 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-black/70 text-white backdrop-blur-sm flex items-center gap-1 shadow-sm">
-                          <Music className="w-3 h-3" /> Audio
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Card metadata footer */}
-                    <div className="p-2.5 sm:p-3 flex flex-col justify-between flex-1 gap-1 border-t border-gray-100 dark:border-gray-700/50">
-                      <p
-                        className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors"
-                        title={file.file_name}
-                      >
-                        {file.file_name}
-                      </p>
-                      <div className="flex items-center justify-between text-[11px] text-gray-400 dark:text-gray-500">
-                        <span>{moment(file.uploadedAt || (file.date ? file.date * 1000 : undefined)).format('YYYY-MM-DD')}</span>
-                        {file.size ? <span>{formatSize(file.size)}</span> : null}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700/60">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[60px]">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={bucket?.length > 0 && checkedFiles.length === bucket?.length}
-                          onChange={toggleSelectAll}
-                          className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
-                          title={checkedFiles.length === bucket?.length ? "Deselect All" : "Select All"}
-                        />
-                      </div>
-                    </TableHead>
-                    <TableHead className="w-[100px]">Preview</TableHead>
-                    <TableHead>File Name</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="w-[80px] text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bucket?.map((file: any, index: number) => {
-                    return (
-                      <TableRow key={file?.msg_id || index}>
-                        <TableCell className="text-gray-500 dark:text-gray-400">
-                          <input
-                            type="checkbox"
-                            checked={checkedFiles.includes(file.msg_id)}
-                            onChange={() => toggleCheckbox(file.msg_id)}
-                            className="w-4 h-4 accent-purple-600 cursor-pointer"
-                          />
-                        </TableCell>
-                        <TableCell
-                          role="button"
-                          onClick={() => preView(index)}>
-                          <div className="flex items-center space-x-3">
-                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center flex-shrink-0 shadow-sm">
-                              <img
-                                src={file.thumbnail}
-                                alt={file.file_name || 'Thumbnail'}
-                                loading="lazy"
-                                className="w-full h-full object-cover transition-transform duration-200 hover:scale-105"
-                                onError={(e) => {
-                                  e.currentTarget.onerror = null;
-                                  e.currentTarget.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell
-                          role="button"
-                          onClick={() => preView(index)}
-                          className="text-gray-700 dark:text-gray-300 font-medium">
-                          {file.file_name}
-                        </TableCell>
-
-                        <TableCell className="text-gray-500 dark:text-gray-400">
-                          {moment(file.uploadedAt || (file.date ? file.date * 1000 : undefined)).format('YYYY-MM-DD')}
-                        </TableCell>
-
-                        <TableCell onClick={(e) => e.stopPropagation()} className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="h-5 w-5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => handleDownload(file?.msg_id, file?.file_name, file)}
-                                className="text-blue-600 dark:text-blue-400">
-                                  <Download className="h-4 w-4 mr-2" />
-                                  Download
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(file?.msg_id)}
-                                className="text-red-600 dark:text-red-400">
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-
-          {/* Pagination */}
-          <div className="flex justify-center items-center flex-wrap gap-2 mt-4 mb-3">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage <= 1}
-              className="px-3.5 py-1.5 border rounded-lg text-sm bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm font-medium">
-              Previous
-            </button>
-
-            <div className="flex items-center">
-              {renderPagination()}
-            </div>
-
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage >= (totalPages || 1)}
-              className="px-3.5 py-1.5 border rounded-lg text-sm bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-gray-300 dark:border-gray-700 hover:bg-purple-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm font-medium">
-              Next
-            </button>
-          </div>
-        </div>
-      </DashboardLayout>
-
-      {showPreView && currentFile && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md"
-          style={{
-            paddingTop: 'env(safe-area-inset-top, 0px)',
-            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-            paddingLeft: 'env(safe-area-inset-left, 0px)',
-            paddingRight: 'env(safe-area-inset-right, 0px)',
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) handleCloseModal();
-          }}
-        >
-          <div className="relative bg-transparent rounded-lg w-full h-full max-w-none flex flex-col">
-            <button
-              type="button"
-              className="absolute z-[60] flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-black/75 hover:bg-black/95 active:scale-95 text-white shadow-xl border border-white/20 backdrop-blur-md cursor-pointer transition-all duration-150"
-              style={{
-                top: 'max(16px, calc(env(safe-area-inset-top, 0px) + 12px))',
-                right: 'max(16px, calc(env(safe-area-inset-right, 0px) + 12px))',
-              }}
-              onClick={handleCloseModal}
-              aria-label="Close">
-              <span className="text-2xl leading-none select-none font-bold">✕</span>
-            </button>
-
-            <div className="flex items-center justify-center relative flex-grow p-4 sm:p-6">
-              {currentIndex > 0 && (
-                <button
-                  type="button"
-                  className="absolute z-[60] flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-black/75 hover:bg-black/95 active:scale-95 text-white shadow-xl border border-white/20 backdrop-blur-md cursor-pointer transition-all duration-150"
-                  style={{
-                    left: 'max(12px, calc(env(safe-area-inset-left, 0px) + 12px))',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                  }}
-                  onClick={handlePreviousImage}
-                  aria-label="Previous">
-                  <span className="text-xl leading-none select-none">◀</span>
-                </button>
-              )}
-
-              {isStreamable(currentFile) ? (
-                (() => {
-                  const mimeType = currentFile?.mime_type || '';
-                  const fileType = currentFile?.type || '';
-                  const streamUrl = currentFile?.stream_url || currentFile?.thumbnail;
-                  
-                  // Debug logging
-                  console.log('Streaming file:', {
-                    mimeType,
-                    fileType,
-                    streamUrl,
-                    file: currentFile
-                  });
-                  
-                  if (!streamUrl) {
-                    return (
-                      <div className="w-full h-full flex items-center justify-center text-white">
-                        <p>Stream URL not available</p>
-                      </div>
-                    );
-                  }
-                  
-                  // For video files
-                  const fileNameLower = (currentFile?.file_name || '').toLowerCase();
-                  const isVideo = mimeType.startsWith('video/') || fileType === 'video' || /\.(mov|mp4|m4v|mkv|webm|avi|3gp|flv|wmv)$/i.test(fileNameLower);
-                  if (isVideo) {
-                    const videoMime = mimeType && mimeType.startsWith('video/') ? mimeType : (fileNameLower.endsWith('.webm') ? 'video/webm' : 'video/mp4');
-                    return (
-                      <div className="w-full h-full flex flex-col items-center justify-center relative">
-                        {mediaLoading && (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-20 rounded-md pointer-events-none">
-                            <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-3" />
-                            <p className="text-white text-sm font-medium animate-pulse">Streaming video...</p>
-                          </div>
-                        )}
-                        <video
-                          ref={videoRef}
-                          key={streamUrl}
-                          src={streamUrl}
-                          controls
-                          autoPlay
-                          playsInline
-                          preload="metadata"
-                          className="max-w-full max-h-[85vh] rounded-md shadow-lg"
-                          onLoadStart={() => setMediaLoading(true)}
-                          onLoadedMetadata={() => setMediaLoading(false)}
-                          onLoadedData={() => setMediaLoading(false)}
-                          onCanPlay={() => setMediaLoading(false)}
-                          onSeeking={() => setMediaLoading(true)}
-                          onSeeked={() => setMediaLoading(false)}
-                          onWaiting={() => setMediaLoading(true)}
-                          onPlaying={() => setMediaLoading(false)}
-                          onError={(e) => {
-                            setMediaLoading(false);
-                            if (!showPreView || !videoRef.current?.getAttribute('src')) {
-                              return;
-                            }
-                            const err = e.currentTarget.error;
-                            if (err && err.code !== MediaError.MEDIA_ERR_ABORTED) {
-                              console.error('Video load error:', err.code, err.message);
-                              toast.error('Failed to load video.');
-                            }
-                          }}>
-                          Your browser does not support the video tag.
-                        </video>
-                      </div>
-                    );
-                  }
-                  
-                  // For PDF files
-                  if (mimeType === 'application/pdf') {
-                    return (
-                      <iframe
-                        src={streamUrl}
-                        className="w-full h-full rounded-md shadow-lg"
-                        onLoad={() => setMediaLoading(false)}
-                        onError={(e) => {
-                          setMediaLoading(false);
-                          console.error('PDF load error:', e);
-                          toast.error('Failed to load PDF. URL: ' + streamUrl);
-                        }}
-                        title={currentFile.file_name || 'PDF Viewer'}
-                      />
-                    );
-                  }
-                  
-                  // For image files
-                  if (mimeType.startsWith('image/') || fileType === 'photo') {
-                    return (
-                      <img
-                        src={streamUrl}
-                        alt={currentFile.file_name || 'Image'}
-                        className="max-w-full max-h-[85vh] object-contain rounded-md shadow-lg"
-                        onLoad={() => setMediaLoading(false)}
-                        onError={(e) => {
-                          setMediaLoading(false);
-                          console.error('Image load error:', e, 'URL:', streamUrl);
-                          toast.error('Failed to load image. URL: ' + streamUrl);
-                        }}
-                      />
-                    );
-                  }
-                  
-                  return null;
-                })()
-              ) : (
-                <img
-                  src={currentFile?.thumbnail}
-                  alt={currentFile?.file_name || 'Preview'}
-                  className="max-w-full max-h-[85vh] object-contain rounded-md shadow-lg"
-                  onLoad={() => setMediaLoading(false)}
-                />
-              )}
-
-              {currentIndex < bucket?.length - 1 && (
-                <button
-                  type="button"
-                  className="absolute z-[60] flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-black/75 hover:bg-black/95 active:scale-95 text-white shadow-xl border border-white/20 backdrop-blur-md cursor-pointer transition-all duration-150"
-                  style={{
-                    right: 'max(12px, calc(env(safe-area-inset-right, 0px) + 12px))',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                  }}
-                  onClick={handleNextImage}
-                  aria-label="Next">
-                  <span className="text-xl leading-none select-none">▶</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-[400px]">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Confirm Delete
-            </h2>
-
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-              Are you sure you want to delete <b>{checkedFiles.length}</b> file(s)?
-              This action cannot be undone.
+            <p className="text-base font-semibold text-blue-900 dark:text-blue-200">
+              Drop files or folders here
             </p>
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              Chunked upload directly to Telegram cloud storage
+            </p>
+          </div>
+        )}
 
-            <div className="flex justify-end gap-3 mt-6">
+        {/* BoxBox Path Navigation & Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-slate-800">
+          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <Link
+              to="/dashboard"
+              className="flex items-center gap-1.5 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors">
+              <HardDrive className="w-4 h-4" />
+              <span>Drives</span>
+            </Link>
+            <ChevronRight className="w-4 h-4 text-slate-400" />
+            <span className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Folder className="w-4 h-4 text-amber-500 fill-amber-500/20" />
+              {bucketName || `Bucket #${params?.id}`}
+            </span>
+            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
+              Telegram Cloud
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span>{totalFilesCount} files</span>
+            <span>•</span>
+            <span>{totalStorageMB} MB used</span>
+            {shareCode && (
+              <>
+                <span>•</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                  <Share2 className="w-3 h-3" /> Shared
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* BoxBox Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          {/* Left: Search input */}
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Search files in bucket..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600">
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Right: Actions, Sort, View mode */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Sort Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs rounded-xl">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="hidden sm:inline capitalize">Sort: {sortKey}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="text-xs">
+                <DropdownMenuItem onClick={() => setSortKey('name')}>Name</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortKey('size')}>Size</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortKey('date')}>Date</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortKey('type')}>Type</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
+                  Order: {sortOrder === 'asc' ? 'Ascending (A-Z)' : 'Descending (Z-A)'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200 dark:border-slate-700">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+                title="Grid View">
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+                title="List View">
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Refresh Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadBucketFiles(currentPage)}
+              disabled={loading}
+              className="h-9 w-9 p-0 rounded-xl"
+              title="Refresh Files">
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+
+            {/* Share Bucket Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsShareModalOpen(true)}
+              className="h-9 gap-1.5 text-xs rounded-xl">
+              <Share2 className="w-3.5 h-3.5 text-blue-500" />
+              <span className="hidden sm:inline">Share</span>
+            </Button>
+
+            {/* Hidden native inputs for file and folder picker */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files) handleFilesUpload(e.target.files);
+              }}
+            />
+            <input
+              ref={folderInputRef}
+              type="file"
+              // @ts-ignore
+              webkitdirectory=""
+              directory=""
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files) handleFilesUpload(e.target.files);
+              }}
+            />
+
+            {/* Upload Buttons */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="h-9 gap-1.5 text-xs rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-sm">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="text-xs">
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="gap-2">
+                  <Upload className="w-4 h-4 text-blue-500" />
+                  Upload Files
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => folderInputRef.current?.click()} className="gap-2">
+                  <FolderUp className="w-4 h-4 text-amber-500" />
+                  Upload Entire Folder
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Selection Bar (Visible when files are selected) */}
+        {selectedFileIds.length > 0 && (
+          <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl text-xs animate-in fade-in duration-150">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSelectAll}
+                className="flex items-center gap-1.5 font-medium text-blue-700 dark:text-blue-300 hover:underline">
+                <CheckSquare className="w-4 h-4" />
+                <span>{selectedFileIds.length} file(s) selected</span>
+              </button>
+              <button
+                onClick={() => setSelectedFileIds([])}
+                className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                Deselect
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
               <Button
+                size="sm"
                 variant="outline"
-                onClick={() => setShowConfirm(false)}
-              >
-                Cancel
+                onClick={handleBulkDownload}
+                disabled={bulkDownloading}
+                className="h-8 gap-1.5 text-xs border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40">
+                <Download className="w-3.5 h-3.5" />
+                <span>{bulkDownloading ? 'Creating ZIP...' : 'Download as ZIP'}</span>
               </Button>
-
               <Button
+                size="sm"
                 variant="destructive"
                 onClick={() => {
-                  setShowConfirm(false);
-                  handleBulkDelete();
+                  setFileToDelete(null);
+                  setIsDeleteConfirmOpen(true);
                 }}
-              >
+                className="h-8 gap-1.5 text-xs bg-rose-600 hover:bg-rose-500 text-white">
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Selected</span>
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Download Progress Banner */}
+        {bulkDownloading && (
+          <div className="p-3 bg-slate-900 text-white rounded-xl flex items-center justify-between text-xs animate-pulse">
+            <div className="flex items-center gap-2.5">
+              <Download className="w-4 h-4 text-blue-400" />
+              <span>
+                Archiving files ({bulkProgress.current} of {bulkProgress.total}): {bulkProgress.currentFileName}
+              </span>
+            </div>
+            <span className="font-mono font-bold text-blue-400">{Math.round(bulkProgress.percent)}%</span>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && processedFiles.length === 0 && (
+          <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
+            <div className="p-4 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 mb-3">
+              <Folder className="w-10 h-10" />
+            </div>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1">
+              {searchQuery ? 'No matching files found' : 'This bucket is empty'}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mb-4">
+              {searchQuery
+                ? `No files match "${searchQuery}". Try adjusting your search term.`
+                : 'Upload files or entire folders to store them permanently on Telegram cloud.'}
+            </p>
+            {!searchQuery && (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-xs gap-1.5">
+                  <Upload className="w-3.5 h-3.5" /> Upload Files
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => folderInputRef.current?.click()}
+                  className="text-xs gap-1.5">
+                  <FolderUp className="w-3.5 h-3.5 text-amber-500" /> Upload Folder
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* BOXBOX FILE GRID VIEW */}
+        {viewMode === 'grid' && processedFiles.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+            {processedFiles.map((file) => {
+              const isSelected = selectedFileIds.includes(String(file.msg_id));
+              const category = getFileCategoryInfo(file.file_name, file.mime_type);
+              const previewType = getPreviewType(file.file_name, file.mime_type);
+              const hasThumbnail = (previewType === 'image' || previewType === 'video') && file.thumbnail;
+
+              return (
+                <div
+                  key={file.msg_id || file.file_name}
+                  onClick={() => setActivePreviewFile(file)}
+                  className={`group relative flex flex-col rounded-2xl border transition-all duration-150 cursor-pointer overflow-hidden ${
+                    isSelected
+                      ? 'border-blue-500 bg-blue-50/40 dark:bg-blue-950/30 ring-2 ring-blue-500/20'
+                      : 'border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md'
+                  }`}>
+                  {/* Select Checkbox (Hover or Selected) */}
+                  <div
+                    onClick={(e) => toggleSelectFile(String(file.msg_id), e)}
+                    className={`absolute top-2 left-2 z-10 p-1 rounded-lg backdrop-blur-md transition-opacity ${
+                      isSelected
+                        ? 'opacity-100 text-blue-600 bg-white/90 dark:bg-slate-900/90'
+                        : 'opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-600 bg-black/40 text-white'
+                    }`}>
+                    {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                  </div>
+
+                  {/* Kebab Context Menu */}
+                  <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <button className="p-1 rounded-lg bg-black/50 text-white hover:bg-black/70 backdrop-blur-md">
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="text-xs">
+                        <DropdownMenuItem onClick={() => setActivePreviewFile(file)} className="gap-2">
+                          <Eye className="w-3.5 h-3.5 text-blue-500" /> Preview
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <a href={file.stream_url ? `${file.stream_url}?dl=1` : '#'} download={file.file_name} className="gap-2 flex items-center">
+                            <Download className="w-3.5 h-3.5 text-emerald-500" /> Download
+                          </a>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => copyDirectLink(file, e)} className="gap-2">
+                          <Copy className="w-3.5 h-3.5 text-purple-500" /> Copy Stream Link
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setPropertiesFile(file)} className="gap-2">
+                          <Info className="w-3.5 h-3.5 text-slate-500" /> Properties
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setFileToDelete(file);
+                            setIsDeleteConfirmOpen(true);
+                          }}
+                          className="gap-2 text-rose-600 dark:text-rose-400">
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  {/* Thumbnail / Icon Container */}
+                  <div className="relative aspect-square w-full bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center overflow-hidden">
+                    {hasThumbnail ? (
+                      <img
+                        src={file.thumbnail}
+                        alt={file.file_name}
+                        loading="lazy"
+                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className={`p-4 rounded-2xl border ${category.color}`}>
+                        <category.icon className="w-10 h-10" />
+                      </div>
+                    )}
+
+                    {/* Bottom type badge on thumbnail */}
+                    <span className={`absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-semibold backdrop-blur-md shadow-xs ${category.badge}`}>
+                      {category.label}
+                    </span>
+                  </div>
+
+                  {/* Card Details Footer */}
+                  <div className="p-2.5 flex flex-col justify-between flex-1 gap-1">
+                    <p className="text-xs font-medium text-slate-800 dark:text-slate-100 truncate" title={file.file_name}>
+                      {file.file_name}
+                    </p>
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span>{formatBytes(file.size)}</span>
+                      {file.date && <span>{moment.unix(file.date).format('MM/DD/YY')}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* BOXBOX FILE LIST VIEW */}
+        {viewMode === 'list' && processedFiles.length > 0 && (
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="p-3 w-10">
+                      <button onClick={handleSelectAll} className="text-slate-400 hover:text-blue-600">
+                        {selectedFileIds.length > 0 && selectedFileIds.length === processedFiles.length ? (
+                          <CheckSquare className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                      </button>
+                    </th>
+                    <th className="p-3 font-semibold">Name</th>
+                    <th className="p-3 font-semibold w-24">Type</th>
+                    <th className="p-3 font-semibold w-24">Size</th>
+                    <th className="p-3 font-semibold w-32">Uploaded</th>
+                    <th className="p-3 font-semibold w-20 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {processedFiles.map((file) => {
+                    const isSelected = selectedFileIds.includes(String(file.msg_id));
+                    const category = getFileCategoryInfo(file.file_name, file.mime_type);
+
+                    return (
+                      <tr
+                        key={file.msg_id || file.file_name}
+                        onClick={() => setActivePreviewFile(file)}
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition-colors ${
+                          isSelected ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''
+                        }`}>
+                        <td className="p-3" onClick={(e) => toggleSelectFile(String(file.msg_id), e)}>
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-blue-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400" />
+                          )}
+                        </td>
+                        <td className="p-3 font-medium text-slate-900 dark:text-slate-100">
+                          <div className="flex items-center gap-2.5 max-w-md">
+                            <category.icon className="w-4 h-4 shrink-0 text-slate-500" />
+                            <span className="truncate" title={file.file_name}>{file.file_name}</span>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${category.color}`}>
+                            {category.label}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-500 font-mono text-[11px]">{formatBytes(file.size)}</td>
+                        <td className="p-3 text-slate-400 text-[11px]">
+                          {file.date ? moment.unix(file.date).format('MMM D, YYYY') : '—'}
+                        </td>
+                        <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <a
+                              href={file.stream_url ? `${file.stream_url}?dl=1` : '#'}
+                              download={file.file_name}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg"
+                              title="Download">
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                            <button
+                              onClick={() => setPropertiesFile(file)}
+                              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
+                              title="Details">
+                              <Info className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setFileToDelete(file);
+                                setIsDeleteConfirmOpen(true);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg"
+                              title="Delete">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800 text-xs">
+            <span className="text-slate-500">
+              Page {currentPage} of {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="h-8 text-xs">
+                Previous
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="h-8 text-xs">
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* BoxBox File Preview Modal */}
+      {activePreviewFile && (
+        <BoxBoxPreviewModal
+          file={activePreviewFile}
+          allFiles={processedFiles}
+          bucketId={params?.id}
+          isOpen={Boolean(activePreviewFile)}
+          onClose={() => setActivePreviewFile(null)}
+          onNavigate={(nextFile) => setActivePreviewFile(nextFile)}
+          onOpenProperties={(f) => setPropertiesFile(f)}
+        />
+      )}
+
+      {/* File Properties Modal */}
+      {propertiesFile && (
+        <FilePropertiesModal
+          file={propertiesFile}
+          bucketId={params?.id}
+          isOpen={Boolean(propertiesFile)}
+          onClose={() => setPropertiesFile(null)}
+        />
+      )}
+
+      {/* Share Modal */}
+      <ShareModal
+        bucketId={params?.id || ''}
+        bucketName={bucketName}
+        shareCode={shareCode}
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        onShareUpdated={() => {
+          loadBucketMeta();
+          setIsShareModalOpen(false);
+        }}
+        token={user}
+      />
+
+      {/* Floating Upload Progress Dock */}
+      <UploadProgressDock
+        isUploading={isUploading}
+        progress={uploadProgress}
+        statusText={uploadStatusText}
+        currentFileName={uploadCurrentFileName}
+        currentIndex={uploadCurrentIndex}
+        totalFiles={uploadTotalCount}
+        onCancel={handleCancelUpload}
+      />
+
+      {/* Confirm Delete Dialog */}
+      {isDeleteConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsDeleteConfirmOpen(false);
+          }}>
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white">Confirm Delete</h3>
+                <p className="text-xs text-slate-500">
+                  {fileToDelete
+                    ? `Delete "${fileToDelete.file_name}" from Telegram cloud?`
+                    : `Delete ${selectedFileIds.length} selected files from Telegram cloud?`}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              This action permanently deletes the messages and files from the Telegram channel. This cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="text-xs">
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteSelected}
+                className="text-xs bg-rose-600 hover:bg-rose-500 text-white">
                 Delete
               </Button>
             </div>
           </div>
         </div>
       )}
-
-      {bulkDownloading && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="p-3 bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 rounded-xl">
-                <Download className="h-6 w-6 animate-bounce" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {bulkProgress.stage === 'zipping'
-                    ? 'Creating ZIP Archive...'
-                    : bulkProgress.stage === 'saving'
-                    ? 'Saving Download...'
-                    : `Downloading Files (${bulkProgress.current}/${bulkProgress.total})`}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {bulkProgress.currentFileName}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2 my-4">
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-                <div
-                  className="bg-purple-600 h-full rounded-full transition-all duration-300 ease-out"
-                  style={{ width: `${bulkProgress.percent}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                <span>{bulkProgress.stage === 'zipping' ? 'Compressing files...' : `${bulkProgress.current} of ${bulkProgress.total} completed`}</span>
-                <span className="font-semibold text-purple-600 dark:text-purple-400">{bulkProgress.percent}%</span>
-              </div>
-            </div>
-
-            <div className="flex justify-end mt-5">
-              <Button
-                variant="outline"
-                onClick={handleCancelBulkDownload}
-                className="text-gray-600 hover:text-gray-800"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* <Toaster position="bottom-center" reverseOrder={false} /> */}
-    </>
+    </DashboardLayout>
   );
 }
