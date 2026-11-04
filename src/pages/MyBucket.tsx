@@ -46,7 +46,7 @@ import { bulkDownloadFiles, BulkProgress } from '@/lib/bulkDownload';
 import { uploadFileChunked } from '@/lib/chunkedUpload';
 import { BoxBoxPreviewModal } from '@/components/dashboard/BoxBoxPreviewModal';
 import { FilePropertiesModal } from '@/components/dashboard/FilePropertiesModal';
-import { UploadProgressDock } from '@/components/dashboard/UploadProgressDock';
+import { UploadProgressDock, UploadItem } from '@/components/dashboard/UploadProgressDock';
 import { ShareModal } from '@/components/dashboard/ShareModal';
 import { ConnectDriveModal } from '@/components/dashboard/ConnectDriveModal';
 import { formatBytes, getFileCategoryInfo, getPreviewType } from '@/lib/fileTypes';
@@ -94,6 +94,7 @@ export default function MyBucket() {
   const [uploadCurrentIndex, setUploadCurrentIndex] = useState(0);
   const [uploadTotalCount, setUploadTotalCount] = useState(0);
   const [uploadAbortController, setUploadAbortController] = useState<AbortController | null>(null);
+  const [uploadQueue, setUploadQueue] = useState<UploadItem[]>([]);
 
   // Bulk ZIP Download state
   const [bulkDownloading, setBulkDownloading] = useState(false);
@@ -208,6 +209,15 @@ export default function MyBucket() {
     if (!fileList || fileList.length === 0 || !params?.id) return;
     const uploadArray = Array.from(fileList);
 
+    const initialQueue: UploadItem[] = uploadArray.map((f, idx) => ({
+      id: `${f.name}-${f.size}-${idx}-${Date.now()}`,
+      name: f.name,
+      size: f.size,
+      status: 'pending',
+      progress: 0,
+    }));
+    setUploadQueue(initialQueue);
+
     const controller = new AbortController();
     setUploadAbortController(controller);
     setIsUploading(true);
@@ -223,6 +233,12 @@ export default function MyBucket() {
         setUploadCurrentFileName(currentFile.name);
         setUploadCurrentIndex(i + 1);
 
+        setUploadQueue((prev) =>
+          prev.map((item, idx) =>
+            idx === i ? { ...item, status: 'uploading', progress: 0 } : item
+          )
+        );
+
         await uploadFileChunked({
           file: currentFile,
           bucketId: params.id,
@@ -231,8 +247,19 @@ export default function MyBucket() {
           onProgress: (p) => {
             setUploadProgress(p.percent);
             setUploadStatusText(p.message);
+            setUploadQueue((prev) =>
+              prev.map((item, idx) =>
+                idx === i ? { ...item, progress: p.percent } : item
+              )
+            );
           },
         });
+
+        setUploadQueue((prev) =>
+          prev.map((item, idx) =>
+            idx === i ? { ...item, status: 'completed', progress: 100 } : item
+          )
+        );
 
         successCount++;
       }
@@ -249,6 +276,13 @@ export default function MyBucket() {
       if (!controller.signal.aborted) {
         console.error('Upload error:', err);
         toast.error(err?.message || 'Failed to complete upload');
+        setUploadQueue((prev) =>
+          prev.map((item) =>
+            item.status === 'uploading'
+              ? { ...item, status: 'failed', error: err?.message }
+              : item
+          )
+        );
       }
     } finally {
       setIsUploading(false);
@@ -263,6 +297,7 @@ export default function MyBucket() {
       uploadAbortController.abort();
       setUploadAbortController(null);
       setIsUploading(false);
+      setUploadQueue([]);
       toast('Upload cancelled');
     }
   };
@@ -931,6 +966,7 @@ export default function MyBucket() {
         currentFileName={uploadCurrentFileName}
         currentIndex={uploadCurrentIndex}
         totalFiles={uploadTotalCount}
+        items={uploadQueue}
         onCancel={handleCancelUpload}
       />
 
