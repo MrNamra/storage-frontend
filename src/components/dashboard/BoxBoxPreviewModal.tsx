@@ -209,6 +209,17 @@ export const BoxBoxPreviewModal: React.FC<BoxBoxPreviewModalProps> = ({
             </a>
           )}
 
+          {downloadUrl && /\.(heic|heif)$/i.test(file.file_name) && (
+            <a
+              href={`${file.stream_url}?format=jpg&dl=1`}
+              download={file.file_name.replace(/\.(heic|heif)$/i, '.jpg')}
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors border border-slate-700 shadow-sm"
+              title="Download as JPG">
+              <Download className="w-3.5 h-3.5" />
+              <span>JPG</span>
+            </a>
+          )}
+
           <Button
             variant="ghost"
             size="sm"

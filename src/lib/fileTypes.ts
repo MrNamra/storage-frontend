@@ -28,7 +28,7 @@ export type PreviewType =
 export const FILE_EXTENSIONS = {
   video: ['mp4', 'webm', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'm4v', '3gp', 'ts'],
   audio: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma', 'opus'],
-  image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif', 'tiff', 'tif', 'heic'],
+  image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif', 'tiff', 'tif', 'heic', 'heif'],
   pdf: ['pdf'],
   code: [
     'js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs',
