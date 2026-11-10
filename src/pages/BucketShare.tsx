@@ -16,6 +16,7 @@ import {
   Lock,
   Globe,
   MoreVertical,
+  ChevronLeft,
   ChevronRight,
   FolderUp,
 } from 'lucide-react';
@@ -122,13 +123,19 @@ export default function BucketShare() {
       });
   };
 
-  useEffect(() => {
-    loadSharedBucket(1);
-  }, [params?.id]);
+  const prevIdRef = useRef(params?.id);
 
   useEffect(() => {
+    if (prevIdRef.current !== params?.id) {
+      prevIdRef.current = params?.id;
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+        return;
+      }
+    }
+    setSelectedFileIds([]);
     loadSharedBucket(currentPage);
-  }, [currentPage]);
+  }, [params?.id, currentPage]);
 
   // Sorted files
   const processedFiles = useMemo(() => {
@@ -238,7 +245,11 @@ export default function BucketShare() {
             ? 'File uploaded to shared bucket successfully!'
             : `${successCount} files uploaded successfully!`
         );
-        loadSharedBucket(1);
+        if (currentPage !== 1) {
+          setCurrentPage(1);
+        } else {
+          loadSharedBucket(1);
+        }
       }
     } catch (err: any) {
       if (!controller.signal.aborted) {
@@ -659,6 +670,41 @@ export default function BucketShare() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800 text-xs">
+            <span className="text-slate-500 tabular-nums">
+              Page {currentPage} of {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={loading || currentPage <= 1}
+                onClick={() => {
+                  setCurrentPage((p) => Math.max(1, p - 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="h-8 px-3 gap-1 text-xs">
+                <ChevronLeft className="w-4 h-4" />
+                <span>Previous</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={loading || currentPage >= totalPages}
+                onClick={() => {
+                  setCurrentPage((p) => Math.min(totalPages, p + 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="h-8 px-3 gap-1 text-xs">
+                <span>Next</span>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         )}
       </div>
